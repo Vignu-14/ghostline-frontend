@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CallNotice, CallSession, CallSignalPayload, ICECandidatePayload } from "../types/call";
+import { getCallConfig } from "../services/chatService";
+import type {
+  CallNotice,
+  CallRuntimeConfig,
+  CallSession,
+  CallSignalPayload,
+  ICECandidatePayload,
+} from "../types/call";
 import type { OutgoingWebSocketMessage, WebSocketEvent } from "../types/websocket";
 
 type EnsureConversationInput = {
@@ -56,6 +63,13 @@ export function useAudioCall({
   const unansweredTimeoutRef = useRef<number | null>(null);
   const disconnectTimeoutRef = useRef<number | null>(null);
   const sessionRef = useRef<CallSession | null>(null);
+  const rtcConfigurationRef = useRef<RTCConfiguration>(RTC_CONFIGURATION);
+  const hasTurnServersRef = useRef(false);
+  const callConfigLoadedRef = useRef(false);
+  const makingOfferRef = useRef(false);
+  const ignoreOfferRef = useRef(false);
+  const isSettingRemoteAnswerPendingRef = useRef(false);
+  const iceRestartedRef = useRef(false);
 
   const [callNotice, setCallNotice] = useState<CallNotice | null>(null);
   const [callSession, setCallSession] = useState<CallSession | null>(null);
@@ -94,14 +108,40 @@ export function useAudioCall({
     }
   }, []);
 
+  const ensureCallRuntimeConfig = useCallback(async () => {
+    if (callConfigLoadedRef.current) {
+      return rtcConfigurationRef.current;
+    }
+
+    try {
+      const response = await getCallConfig();
+      const nextConfiguration = normalizeRTCConfiguration(response);
+      rtcConfigurationRef.current = nextConfiguration;
+      hasTurnServersRef.current = Boolean(response.has_turn);
+    } catch {
+      rtcConfigurationRef.current = RTC_CONFIGURATION;
+      hasTurnServersRef.current = false;
+    } finally {
+      callConfigLoadedRef.current = true;
+    }
+
+    return rtcConfigurationRef.current;
+  }, []);
+
   const releaseMediaResources = useCallback(() => {
     clearDisconnectTimer();
     clearUnansweredTimer();
     pendingCandidatesRef.current = [];
+    ignoreOfferRef.current = false;
+    isSettingRemoteAnswerPendingRef.current = false;
+    makingOfferRef.current = false;
+    iceRestartedRef.current = false;
 
     if (peerConnectionRef.current) {
       peerConnectionRef.current.onconnectionstatechange = null;
+      peerConnectionRef.current.oniceconnectionstatechange = null;
       peerConnectionRef.current.onicecandidate = null;
+      peerConnectionRef.current.onnegotiationneeded = null;
       peerConnectionRef.current.ontrack = null;
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
@@ -195,7 +235,10 @@ export function useAudioCall({
           }));
           break;
         case "failed":
-          handlePeerConnectionFailure("The call connection failed.");
+          updateSession((session) => ({
+            ...session,
+            status: "The browser is retrying the call connection...",
+          }));
           break;
         case "closed":
           if (sessionRef.current) {
@@ -227,16 +270,38 @@ export function useAudioCall({
     }
   }, []);
 
+  const attachLocalTracks = useCallback((connection: RTCPeerConnection) => {
+    const stream = localStreamRef.current;
+    if (!stream) {
+      return;
+    }
+
+    const existingTrackIDs = new Set(
+      connection
+        .getSenders()
+        .map((sender) => sender.track?.id)
+        .filter((trackID): trackID is string => Boolean(trackID)),
+    );
+
+    stream.getAudioTracks().forEach((track) => {
+      if (!existingTrackIDs.has(track.id)) {
+        connection.addTrack(track, stream);
+      }
+    });
+  }, []);
+
   const ensurePeerConnection = useCallback(async () => {
     if (typeof RTCPeerConnection === "undefined") {
       throw new Error("calling_not_supported");
     }
 
     if (peerConnectionRef.current) {
+      attachLocalTracks(peerConnectionRef.current);
       return peerConnectionRef.current;
     }
 
-    const connection = new RTCPeerConnection(RTC_CONFIGURATION);
+    const configuration = await ensureCallRuntimeConfig();
+    const connection = new RTCPeerConnection(configuration);
 
     connection.onicecandidate = (event) => {
       const current = sessionRef.current;
@@ -273,19 +338,89 @@ export function useAudioCall({
       setRemoteStream(nextStream);
     };
 
+    connection.onnegotiationneeded = async () => {
+      const current = sessionRef.current;
+      if (!current || current.direction !== "outgoing") {
+        return;
+      }
+
+      try {
+        makingOfferRef.current = true;
+        await connection.setLocalDescription();
+        const description = connection.localDescription;
+        if (!description) {
+          return;
+        }
+
+        sendSignal({
+          type: "call_offer",
+          receiver_id: current.peerID,
+          call_id: current.callID,
+          description: {
+            type: description.type,
+            sdp: description.sdp || "",
+          },
+          username: currentUsername,
+        });
+      } catch {
+        handlePeerConnectionFailure("Unable to prepare the call offer.");
+      } finally {
+        makingOfferRef.current = false;
+      }
+    };
+
     connection.onconnectionstatechange = () => {
       handleConnectionStateChange(connection.connectionState);
     };
 
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        connection.addTrack(track, localStreamRef.current as MediaStream);
-      });
-    }
+    connection.oniceconnectionstatechange = () => {
+      const current = sessionRef.current;
+      if (!current) {
+        return;
+      }
+
+      switch (connection.iceConnectionState) {
+        case "connected":
+        case "completed":
+          iceRestartedRef.current = false;
+          break;
+        case "failed":
+          if (current.direction === "outgoing" && !iceRestartedRef.current) {
+            iceRestartedRef.current = true;
+            updateSession((session) => ({
+              ...session,
+              status: hasTurnServersRef.current
+                ? "Media path failed. Trying to reconnect through the relay..."
+                : "Media path failed. Trying one more direct reconnect...",
+            }));
+            connection.restartIce();
+            return;
+          }
+
+          handlePeerConnectionFailure(
+            hasTurnServersRef.current
+              ? "The call media path failed, even after trying the relay server."
+              : "The call media path failed. Add a TURN server for cross-network calls.",
+          );
+          break;
+        default:
+          break;
+      }
+    };
+
+    attachLocalTracks(connection);
 
     peerConnectionRef.current = connection;
     return connection;
-  }, [currentUsername, handleConnectionStateChange, sendSignal]);
+  }, [
+    attachLocalTracks,
+    currentUsername,
+    ensureCallRuntimeConfig,
+    handleConnectionStateChange,
+    handlePeerConnectionFailure,
+    sendSignal,
+    updateSession,
+  ]);
 
   const ensureLocalAudio = useCallback(async () => {
     if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
@@ -312,34 +447,6 @@ export function useAudioCall({
     return stream;
   }, []);
 
-  const createAndSendOffer = useCallback(async () => {
-    const current = sessionRef.current;
-    if (!current) {
-      return;
-    }
-
-    if (!localStreamRef.current) {
-      await ensureLocalAudio();
-    }
-
-    const connection = await ensurePeerConnection();
-    const offer = await connection.createOffer({
-      offerToReceiveAudio: true,
-    });
-
-    await connection.setLocalDescription(offer);
-    sendSignal({
-      type: "call_offer",
-      receiver_id: current.peerID,
-      call_id: current.callID,
-      description: {
-        type: offer.type,
-        sdp: offer.sdp || "",
-      },
-      username: currentUsername,
-    });
-  }, [currentUsername, ensureLocalAudio, ensurePeerConnection, sendSignal]);
-
   const acceptIncomingCall = useCallback(async () => {
     const current = sessionRef.current;
     if (!current || current.phase !== "incoming") {
@@ -354,7 +461,7 @@ export function useAudioCall({
     }));
 
     try {
-      await ensureLocalAudio();
+      await Promise.all([ensureLocalAudio(), ensureCallRuntimeConfig()]);
       if (!sessionRef.current || sessionRef.current.callID !== current.callID) {
         releaseMediaResources();
         return;
@@ -388,6 +495,7 @@ export function useAudioCall({
     }
   }, [
     currentUsername,
+    ensureCallRuntimeConfig,
     ensureLocalAudio,
     ensurePeerConnection,
     finishCall,
@@ -506,13 +614,12 @@ export function useAudioCall({
       });
 
       try {
-        await ensureLocalAudio();
+        await Promise.all([ensureLocalAudio(), ensureCallRuntimeConfig()]);
         if (!sessionRef.current || sessionRef.current.callID !== nextCallID) {
           releaseMediaResources();
           return;
         }
 
-        await ensurePeerConnection();
         const delivered = sendSignal({
           type: "call_invite",
           receiver_id: peerID,
@@ -558,8 +665,8 @@ export function useAudioCall({
       clearUnansweredTimer,
       commitSession,
       currentUsername,
+      ensureCallRuntimeConfig,
       ensureLocalAudio,
-      ensurePeerConnection,
       finishCall,
       releaseMediaResources,
       sendSignal,
@@ -661,7 +768,7 @@ export function useAudioCall({
           phase: "connecting",
           status: `@${session.peerUsername} joined. Connecting audio...`,
         }));
-        void createAndSendOffer().catch(() => {
+        void ensurePeerConnection().catch(() => {
           handlePeerConnectionFailure("Unable to start the audio call.");
         });
         break;
@@ -690,10 +797,31 @@ export function useAudioCall({
         void (async () => {
           try {
             const connection = await ensurePeerConnection();
-            await connection.setRemoteDescription(toRTCSessionDescription(description));
+            const readyForOffer =
+              !makingOfferRef.current &&
+              (connection.signalingState === "stable" || isSettingRemoteAnswerPendingRef.current);
+            const offerCollision = !readyForOffer;
+            const polite = shouldYieldToIncomingInvite(currentUserID, incomingUserID);
+            ignoreOfferRef.current = !polite && offerCollision;
+            if (ignoreOfferRef.current) {
+              return;
+            }
+
+            if (offerCollision) {
+              await Promise.all([
+                connection.setLocalDescription({ type: "rollback" }),
+                connection.setRemoteDescription(toRTCSessionDescription(description)),
+              ]);
+            } else {
+              await connection.setRemoteDescription(toRTCSessionDescription(description));
+            }
+
             await flushPendingCandidates();
-            const answer = await connection.createAnswer();
-            await connection.setLocalDescription(answer);
+            await connection.setLocalDescription();
+            const answer = connection.localDescription;
+            if (!answer) {
+              throw new Error("missing_local_answer");
+            }
             sendSignal({
               type: "call_answer",
               receiver_id: active.peerID,
@@ -724,7 +852,9 @@ export function useAudioCall({
         void (async () => {
           try {
             const connection = await ensurePeerConnection();
+            isSettingRemoteAnswerPendingRef.current = true;
             await connection.setRemoteDescription(toRTCSessionDescription(description));
+            isSettingRemoteAnswerPendingRef.current = false;
             await flushPendingCandidates();
             updateSession((session) => ({
               ...session,
@@ -732,6 +862,7 @@ export function useAudioCall({
               status: `Connecting to @${session.peerUsername}...`,
             }));
           } catch {
+            isSettingRemoteAnswerPendingRef.current = false;
             handlePeerConnectionFailure("Unable to connect the call.");
           }
         })();
@@ -743,6 +874,10 @@ export function useAudioCall({
         }
         void (async () => {
           const connection = peerConnectionRef.current;
+          if (ignoreOfferRef.current) {
+            return;
+          }
+
           if (!connection) {
             pendingCandidatesRef.current.push(payload.candidate as RTCIceCandidateInit);
             return;
@@ -772,7 +907,6 @@ export function useAudioCall({
   }, [
     clearUnansweredTimer,
     commitSession,
-    createAndSendOffer,
     currentUserID,
     currentUsername,
     ensurePeerConnection,
@@ -904,4 +1038,25 @@ function toRTCSessionDescription(description: CallSignalPayload["description"]):
     sdp: description?.sdp || "",
     type: (description?.type || "offer") as RTCSdpType,
   };
+}
+
+function normalizeRTCConfiguration(config: CallRuntimeConfig): RTCConfiguration {
+  const iceServers =
+    Array.isArray(config.ice_servers) && config.ice_servers.length > 0
+      ? config.ice_servers.map((server) => ({
+          credential: server.credential,
+          urls: server.urls,
+          username: server.username,
+        }))
+      : RTC_CONFIGURATION.iceServers;
+
+  return {
+    iceCandidatePoolSize: 2,
+    iceServers,
+    iceTransportPolicy: toIceTransportPolicy(config.transport_policy),
+  };
+}
+
+function toIceTransportPolicy(value?: string): RTCIceTransportPolicy {
+  return value === "relay" ? "relay" : "all";
 }

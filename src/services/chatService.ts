@@ -5,6 +5,7 @@ import type {
   Message,
   SendMessageRequest,
 } from "../types/message";
+import type { CallRuntimeConfig } from "../types/call";
 import type { UserSearchResult } from "../types/user";
 import { apiRequest } from "./api";
 
@@ -76,6 +77,10 @@ export function clearConversation(userID: string, input: ClearConversationReques
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function getCallConfig() {
+  return apiRequest<CallRuntimeConfig>("/api/calls/config");
 }
 
 function normalizeConversation(conversation: ConversationResponse): Conversation | null {

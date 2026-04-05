@@ -59,3 +59,15 @@ export interface CallNotice {
   message: string;
   tone: CallNoticeTone;
 }
+
+export interface CallIceServer {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+export interface CallRuntimeConfig {
+  has_turn: boolean;
+  ice_servers: CallIceServer[];
+  transport_policy?: RTCIceTransportPolicy | string;
+}
