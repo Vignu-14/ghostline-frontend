@@ -523,6 +523,104 @@ img {
   align-items: center;
 }
 
+.chat-window__call-trigger {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-window__call-icon {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.call-panel,
+.call-notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.call-panel {
+  background:
+    radial-gradient(circle at top left, rgba(216, 95, 61, 0.14), transparent 38%),
+    rgba(255, 255, 255, 0.52);
+}
+
+.call-panel--incoming {
+  border-color: rgba(216, 95, 61, 0.34);
+  background:
+    radial-gradient(circle at top left, rgba(216, 95, 61, 0.2), transparent 42%),
+    rgba(255, 247, 240, 0.72);
+}
+
+.call-panel__copy,
+.call-notice {
+  flex-direction: column;
+}
+
+.call-panel__copy,
+.call-panel__meta {
+  display: flex;
+}
+
+.call-panel__copy {
+  gap: 6px;
+}
+
+.call-panel__copy h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 2vw, 1.9rem);
+  line-height: 1;
+}
+
+.call-panel__copy p {
+  margin: 0;
+}
+
+.call-panel__meta {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.call-panel__meta span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(53, 38, 31, 0.08);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.call-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.call-panel audio {
+  display: none;
+}
+
+.call-notice {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.call-notice--error {
+  border-color: rgba(164, 58, 31, 0.24);
+  background: rgba(164, 58, 31, 0.08);
+}
+
+.call-notice p {
+  margin: 0;
+}
+
 .chat-window__messages {
   display: flex;
   flex-direction: column;
@@ -766,6 +864,17 @@ img {
 
   .chat-window__header--split {
     flex-direction: column;
+  }
+
+  .call-panel,
+  .call-notice {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .call-panel__actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .mobile-nav {

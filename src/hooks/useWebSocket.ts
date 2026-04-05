@@ -6,11 +6,14 @@ export function useWebSocket(enabled: boolean) {
   const socketRef = useRef<ChatSocket | null>(null);
   const [events, setEvents] = useState<WebSocketEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [lastEvent, setLastEvent] = useState<WebSocketEvent | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       socketRef.current?.close();
       socketRef.current = null;
+      setEvents([]);
+      setLastEvent(null);
       setIsConnected(false);
       return;
     }
@@ -19,11 +22,14 @@ export function useWebSocket(enabled: boolean) {
     socketRef.current = socket;
     socket.connect(
       (event) => {
-        setEvents((current) => [...current, event]);
-        setIsConnected(true);
+        setEvents((current) => [...current.slice(-39), event]);
+        setLastEvent(event);
       },
       () => {
         setIsConnected(false);
+      },
+      () => {
+        setIsConnected(true);
       },
     );
 
@@ -35,12 +41,13 @@ export function useWebSocket(enabled: boolean) {
   }, [enabled]);
 
   function send(payload: OutgoingWebSocketMessage) {
-    socketRef.current?.send(payload);
+    return socketRef.current?.send(payload) ?? false;
   }
 
   return {
     events,
     isConnected,
+    lastEvent,
     send,
   };
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChatList } from "../components/chat/ChatList";
 import { ChatWindow } from "../components/chat/ChatWindow";
 import { useAuth } from "../hooks/useAuth";
+import { useAudioCall } from "../hooks/useAudioCall";
 import { useWebSocket } from "../hooks/useWebSocket";
 import * as chatService from "../services/chatService";
 import type { Conversation, DeleteMode, Message } from "../types/message";
@@ -18,6 +19,44 @@ export function ChatPage() {
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const socket = useWebSocket(Boolean(user));
+  const activeConversationUsername = activeConversation?.username;
+
+  function ensureConversation(selectedUser: { id: string; username?: string }) {
+    const nextConversation: Conversation = {
+      user_id: selectedUser.id,
+      username: selectedUser.username || "ghost",
+      profile_picture_url: null,
+      unread_count: 0,
+      last_message: "",
+      last_message_at: "",
+    };
+
+    setActiveConversation((current) => (current?.user_id === selectedUser.id ? current : nextConversation));
+    setConversations((current) =>
+      current.some((conversation) => conversation.user_id === selectedUser.id)
+        ? current
+        : [nextConversation, ...current],
+    );
+  }
+
+  const {
+    acceptIncomingCall,
+    callNotice,
+    callSession,
+    declineIncomingCall,
+    dismissCallNotice,
+    endCall,
+    remoteAudioRef,
+    startCall,
+    toggleMute,
+  } = useAudioCall({
+    currentUserID: user?.id || "",
+    currentUsername: user?.username || "",
+    lastEvent: socket.lastEvent,
+    onEnsureConversation: ensureConversation,
+    send: socket.send,
+    socketConnected: socket.isConnected,
+  });
 
   if (!user) {
     return null;
@@ -129,7 +168,7 @@ export function ChatPage() {
   }, [user, activeConversation]);
 
   useEffect(() => {
-    const latestEvent = socket.events[socket.events.length - 1];
+    const latestEvent = socket.lastEvent;
     if (!latestEvent) {
       return;
     }
@@ -169,7 +208,18 @@ export function ChatPage() {
     }
 
     void loadConversations(conversationUserID);
-  }, [socket.events]);
+  }, [activeConversation?.user_id, socket.lastEvent, user]);
+
+  useEffect(() => {
+    if (!callSession) {
+      return;
+    }
+
+    ensureConversation({
+      id: callSession.peerID,
+      username: callSession.peerUsername,
+    });
+  }, [callSession]);
 
   async function handleSend(content: string) {
     if (!activeConversation || !user) {
@@ -296,13 +346,22 @@ export function ChatPage() {
           searchResults={searchResults}
         />
         <ChatWindow
+          callNotice={callNotice}
+          callSession={callSession}
           conversationUserID={activeConversation?.user_id}
           currentUserID={user.id}
           disabled={!activeConversation}
           messages={messages}
+          onAcceptCall={acceptIncomingCall}
+          onDeclineCall={declineIncomingCall}
+          onDismissCallNotice={dismissCallNotice}
+          onEndCall={endCall}
           onClearConversation={handleClearConversation}
           onDeleteMessages={handleDeleteMessages}
           onSend={handleSend}
+          onStartCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername)}
+          onToggleMute={toggleMute}
+          remoteAudioRef={remoteAudioRef}
           title={activeConversation ? `@${activeConversation.username}` : "Choose a conversation"}
         />
       </section>

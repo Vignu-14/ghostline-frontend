@@ -1,6 +1,9 @@
+import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../common/Button";
+import type { CallNotice, CallSession } from "../../types/call";
 import type { DeleteMode, Message } from "../../types/message";
+import { CallPanel } from "./CallPanel";
 import { ChatMessage } from "./ChatMessage";
 import { MessageInput } from "./MessageInput";
 
@@ -22,10 +25,19 @@ type ChatWindowProps = {
   currentUserID: string;
   disabled?: boolean;
   messages: Message[];
+  onAcceptCall: () => void;
+  onDeclineCall: () => void;
+  onDismissCallNotice: () => void;
+  onEndCall: () => void;
   onClearConversation: (userID: string, mode: DeleteMode) => Promise<void>;
   onDeleteMessages: (messageIDs: string[], mode: DeleteMode) => Promise<void>;
   title: string;
   onSend: (content: string) => Promise<void>;
+  onStartCall: () => Promise<void> | void;
+  onToggleMute: () => void;
+  callNotice: CallNotice | null;
+  callSession: CallSession | null;
+  remoteAudioRef: RefObject<HTMLAudioElement | null>;
 };
 
 export function ChatWindow({
@@ -33,10 +45,19 @@ export function ChatWindow({
   currentUserID,
   disabled,
   messages,
+  onAcceptCall,
+  onDeclineCall,
+  onDismissCallNotice,
+  onEndCall,
   onClearConversation,
   onDeleteMessages,
   title,
   onSend,
+  onStartCall,
+  onToggleMute,
+  callNotice,
+  callSession,
+  remoteAudioRef,
 }: ChatWindowProps) {
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(null);
@@ -185,6 +206,16 @@ export function ChatWindow({
                 <Button disabled={isWorking} onClick={() => setIsSelectionMode(true)} type="button" variant="quiet">
                   Select
                 </Button>
+                <Button
+                  className="chat-window__call-trigger"
+                  disabled={isWorking || !conversationUserID || Boolean(callSession)}
+                  onClick={() => void onStartCall()}
+                  type="button"
+                  variant="quiet"
+                >
+                  <CallIcon />
+                  <span>{callSession ? "Call active" : "Call"}</span>
+                </Button>
                 <Button disabled={isWorking} onClick={openClearDialog} type="button" variant="ghost">
                   Clear chat
                 </Button>
@@ -195,6 +226,16 @@ export function ChatWindow({
       </header>
 
       {localError ? <p className="form-error">{localError}</p> : null}
+      <CallPanel
+        callNotice={callNotice}
+        callSession={callSession && callSession.peerID === conversationUserID ? callSession : null}
+        onAccept={onAcceptCall}
+        onDecline={onDeclineCall}
+        onDismissNotice={onDismissCallNotice}
+        onEnd={onEndCall}
+        onToggleMute={onToggleMute}
+        remoteAudioRef={remoteAudioRef}
+      />
 
       <div className="chat-window__messages" ref={messageListRef}>
         {disabled ? (
@@ -264,5 +305,13 @@ export function ChatWindow({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function CallIcon() {
+  return (
+    <svg aria-hidden="true" className="chat-window__call-icon" viewBox="0 0 24 24">
+      <path d="M6.6 10.8c1.9 3.7 4.9 6.7 8.6 8.6l2.9-2.9a1 1 0 0 1 1-.24c1.02.34 2.1.52 3.2.52a1 1 0 0 1 1 1V22a1 1 0 0 1-1 1C10.42 23 1 13.58 1 2a1 1 0 0 1 1-1h4.22a1 1 0 0 1 1 1c0 1.1.18 2.18.52 3.2a1 1 0 0 1-.24 1z" />
+    </svg>
   );
 }
