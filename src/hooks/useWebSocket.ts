@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatSocket } from "../services/websocketService";
 import type { OutgoingWebSocketMessage, WebSocketEvent } from "../types/websocket";
 
@@ -40,9 +40,9 @@ export function useWebSocket(enabled: boolean) {
     };
   }, [enabled]);
 
-  function send(payload: OutgoingWebSocketMessage) {
+  const send = useCallback((payload: OutgoingWebSocketMessage) => {
     return socketRef.current?.send(payload) ?? false;
-  }
+  }, []);
 
   return {
     events,

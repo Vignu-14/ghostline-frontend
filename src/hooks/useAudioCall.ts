@@ -809,7 +809,27 @@ export function useAudioCall({
     window.addEventListener("pagehide", handlePageHide);
     return () => {
       window.removeEventListener("pagehide", handlePageHide);
-      handlePageHide();
+    };
+  }, [currentUsername, releaseMediaResources, sendSignal]);
+
+  useEffect(() => {
+    return () => {
+      const current = sessionRef.current;
+      if (!current) {
+        return;
+      }
+
+      sendSignal(
+        {
+          type: "call_end",
+          receiver_id: current.peerID,
+          call_id: current.callID,
+          reason: "chat_closed",
+          username: currentUsername,
+        },
+        { silentFailure: true },
+      );
+      releaseMediaResources();
     };
   }, [currentUsername, releaseMediaResources, sendSignal]);
 
