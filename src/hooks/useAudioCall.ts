@@ -70,6 +70,8 @@ export function useAudioCall({
   const ignoreOfferRef = useRef(false);
   const isSettingRemoteAnswerPendingRef = useRef(false);
   const iceRestartedRef = useRef(false);
+  const processedCallEventsRef = useRef<Set<string>>(new Set());
+  const pendingRemoteOfferRef = useRef<CallSignalPayload["description"] | null>(null);
 
   const [callNotice, setCallNotice] = useState<CallNotice | null>(null);
   const [callSession, setCallSession] = useState<CallSession | null>(null);
@@ -136,6 +138,7 @@ export function useAudioCall({
     isSettingRemoteAnswerPendingRef.current = false;
     makingOfferRef.current = false;
     iceRestartedRef.current = false;
+    pendingRemoteOfferRef.current = null;
 
     if (peerConnectionRef.current) {
       peerConnectionRef.current.onconnectionstatechange = null;
@@ -480,6 +483,31 @@ export function useAudioCall({
         phase: "connecting",
         status: `Connecting to @${session.peerUsername}...`,
       }));
+
+      // If we have a pending offer from before we accepted, handle it now
+      if (pendingRemoteOfferRef.current) {
+        const description = pendingRemoteOfferRef.current;
+        pendingRemoteOfferRef.current = null;
+
+        const connection = await ensurePeerConnection();
+        await connection.setRemoteDescription(toRTCSessionDescription(description));
+        await flushPendingCandidates();
+        await connection.setLocalDescription();
+
+        const answer = connection.localDescription;
+        if (answer) {
+          sendSignal({
+            type: "call_answer",
+            receiver_id: current.peerID,
+            call_id: current.callID,
+            description: {
+              type: answer.type,
+              sdp: answer.sdp || "",
+            },
+            username: currentUsername,
+          });
+        }
+      }
     } catch (error) {
       sendSignal(
         {
@@ -707,6 +735,16 @@ export function useAudioCall({
     const incomingUsername = payload.username?.trim() || "ghost";
     const active = sessionRef.current;
 
+    // Fix Bug 2: Prevent processing the same event multiple times (Zombie Loop)
+    const eventFingerprint = `${lastEvent.type}:${payload.call_id}`;
+    if (processedCallEventsRef.current.has(eventFingerprint)) {
+      return;
+    }
+    // Only mark invite/accept/end signals as processed to avoid blocking frequent ones like ICE
+    if (["call_invite", "call_accept", "call_decline", "call_cancel", "call_end"].includes(lastEvent.type)) {
+      processedCallEventsRef.current.add(eventFingerprint);
+    }
+
     if (lastEvent.type === "call_invite") {
       if (active) {
         if (
@@ -794,53 +832,59 @@ export function useAudioCall({
         }
         {
           const description = payload.description;
-        void (async () => {
-          try {
-            const connection = await ensurePeerConnection();
-            const readyForOffer =
-              !makingOfferRef.current &&
-              (connection.signalingState === "stable" || isSettingRemoteAnswerPendingRef.current);
-            const offerCollision = !readyForOffer;
-            const polite = shouldYieldToIncomingInvite(currentUserID, incomingUserID);
-            ignoreOfferRef.current = !polite && offerCollision;
-            if (ignoreOfferRef.current) {
-              return;
-            }
-
-            if (offerCollision) {
-              await Promise.all([
-                connection.setLocalDescription({ type: "rollback" }),
-                connection.setRemoteDescription(toRTCSessionDescription(description)),
-              ]);
-            } else {
-              await connection.setRemoteDescription(toRTCSessionDescription(description));
-            }
-
-            await flushPendingCandidates();
-            await connection.setLocalDescription();
-            const answer = connection.localDescription;
-            if (!answer) {
-              throw new Error("missing_local_answer");
-            }
-            sendSignal({
-              type: "call_answer",
-              receiver_id: active.peerID,
-              call_id: active.callID,
-              description: {
-                type: answer.type,
-                sdp: answer.sdp || "",
-              },
-              username: currentUsername,
-            });
-            updateSession((session) => ({
-              ...session,
-              phase: "connecting",
-              status: `Joining @${session.peerUsername}...`,
-            }));
-          } catch {
-            handlePeerConnectionFailure("Unable to answer the call.");
+          // Fix Bug 1: If we haven't accepted the call yet, buffer the offer
+          if (!active || active.phase === "incoming") {
+            pendingRemoteOfferRef.current = description;
+            return;
           }
-        })();
+
+          void (async () => {
+            try {
+              const connection = await ensurePeerConnection();
+              const readyForOffer =
+                !makingOfferRef.current &&
+                (connection.signalingState === "stable" || isSettingRemoteAnswerPendingRef.current);
+              const offerCollision = !readyForOffer;
+              const polite = shouldYieldToIncomingInvite(currentUserID, incomingUserID);
+              ignoreOfferRef.current = !polite && offerCollision;
+              if (ignoreOfferRef.current) {
+                return;
+              }
+
+              if (offerCollision) {
+                await Promise.all([
+                  connection.setLocalDescription({ type: "rollback" }),
+                  connection.setRemoteDescription(toRTCSessionDescription(description)),
+                ]);
+              } else {
+                await connection.setRemoteDescription(toRTCSessionDescription(description));
+              }
+
+              await flushPendingCandidates();
+              await connection.setLocalDescription();
+              const answer = connection.localDescription;
+              if (!answer) {
+                throw new Error("missing_local_answer");
+              }
+              sendSignal({
+                type: "call_answer",
+                receiver_id: active.peerID,
+                call_id: active.callID,
+                description: {
+                  type: answer.type,
+                  sdp: answer.sdp || "",
+                },
+                username: currentUsername,
+              });
+              updateSession((session) => ({
+                ...session,
+                phase: "connecting",
+                status: `Joining @${session.peerUsername}...`,
+              }));
+            } catch {
+              handlePeerConnectionFailure("Unable to answer the call.");
+            }
+          })();
         }
         break;
       case "call_answer":
