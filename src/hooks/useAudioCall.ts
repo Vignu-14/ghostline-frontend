@@ -31,6 +31,8 @@ const CALL_SIGNAL_TYPES = new Set([
   "call_cancel",
   "call_offer",
   "call_answer",
+  "sdp_offer",
+  "sdp_answer",
   "call_ice_candidate",
   "call_end",
   "call_mute_state",
@@ -827,11 +829,12 @@ export function useAudioCall({
         finishCall(`Call with @${active.peerUsername} ended.`);
         break;
       case "call_offer":
-        if (!payload.description) {
+      case "sdp_offer":
+        if (!payload.description && !(payload as any).sdp) {
           return;
         }
         {
-          const description = payload.description;
+          const description = payload.description || { type: "offer", sdp: (payload as any).sdp };
           // Fix Bug 1: If we haven't accepted the call yet, buffer the offer
           if (!active || active.phase === "incoming") {
             pendingRemoteOfferRef.current = description;
@@ -888,11 +891,12 @@ export function useAudioCall({
         }
         break;
       case "call_answer":
-        if (!payload.description) {
+      case "sdp_answer":
+        if (!payload.description && !(payload as any).sdp) {
           return;
         }
         {
-          const description = payload.description;
+          const description = payload.description || { type: "answer", sdp: (payload as any).sdp };
         void (async () => {
           try {
             const connection = await ensurePeerConnection();
