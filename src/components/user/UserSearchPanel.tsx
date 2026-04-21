@@ -42,37 +42,38 @@ export function UserSearchPanel() {
   }, [query]);
 
   return (
-    <section className="panel user-search-panel">
-      <p className="eyebrow">Discover people</p>
-      <h2>Search Ghostline users</h2>
-      <label className="field">
-        <span className="field__label">Username</span>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <p className="text-sm text-muted" style={{ marginBottom: '14px' }}>
+        Find people on Ghostline and check out their profiles.
+      </p>
+
+      <div className="form-group" style={{ marginBottom: '12px' }}>
         <input
-          className="field__input"
+          className="input-base"
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Type even 1 letter..."
+          placeholder="Search by username..."
           value={query}
         />
-      </label>
+      </div>
 
       {error ? <p className="form-error">{error}</p> : null}
-      {isSearching ? <p className="support-copy">Searching users...</p> : null}
+      {isSearching ? <p className="text-muted text-sm">Searching...</p> : null}
 
       {query.trim().length >= 1 && !isSearching && results.length === 0 ? (
-        <p className="support-copy">No matching users found.</p>
+        <p className="text-muted text-sm">No matching users found.</p>
       ) : null}
 
-      <div className="user-search-panel__results">
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         {results.map((user) => (
-          <Link className="user-search-panel__result" key={user.id} to={`/u/${user.username}`}>
+          <Link className="user-list-item" key={user.id} to={`/u/${user.username}`}>
             <Avatar alt={user.username} src={user.profile_picture_url} />
-            <span className="chat-list__copy">
-              <strong>@{user.username}</strong>
-              <span>Open profile</span>
-            </span>
+            <div className="user-list-item__info">
+              <span className="font-medium text-sm">@{user.username}</span>
+              <span className="text-faint text-xs">View profile</span>
+            </div>
           </Link>
         ))}
       </div>
-    </section>
+    </div>
   );
 }

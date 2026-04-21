@@ -1,6 +1,6 @@
 import type { Conversation } from "../../types/message";
 import type { UserSearchResult } from "../../types/user";
-import { Avatar } from "../common/Avatar";
+import { formatRelativeDate } from "../../utils/formatDate";
 import { UnreadBadge } from "./UnreadBadge";
 
 type ChatListProps = {
@@ -12,6 +12,7 @@ type ChatListProps = {
   searchResults: UserSearchResult[];
   isSearching: boolean;
   onStartConversation: (user: UserSearchResult) => void;
+  isOpen?: boolean;
 };
 
 export function ChatList({
@@ -23,68 +24,96 @@ export function ChatList({
   searchResults,
   isSearching,
   onStartConversation,
+  isOpen,
 }: ChatListProps) {
   return (
-    <aside className="chat-list">
-      <div className="chat-search">
-        <label className="field">
-          <span className="field__label">Search usernames</span>
+    <aside className={`chat-sidebar ${isOpen ? "chat-sidebar--open" : ""}`}>
+      <div className="chat-sidebar__header">
+        <h2>Messages</h2>
+        <div className="chat-sidebar__search">
+          <span className="chat-sidebar__search-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </span>
           <input
-            className="field__input"
+            className="input-base"
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Type even 1 letter..."
+            placeholder="Search people..."
             value={searchQuery}
           />
-        </label>
+        </div>
 
         {searchQuery.trim().length >= 1 ? (
-          <div className="chat-search__results">
-            {isSearching ? <p className="support-copy">Searching users...</p> : null}
+          <div style={{ marginTop: '12px' }}>
+            {isSearching ? (
+              <p className="text-muted text-sm" style={{ padding: '4px 0' }}>Searching...</p>
+            ) : null}
 
             {!isSearching && searchResults.length === 0 ? (
-              <p className="support-copy">No matching users found.</p>
+              <p className="text-muted text-sm" style={{ padding: '4px 0' }}>No matching users found.</p>
             ) : null}
 
             {searchResults.map((user) => (
               <button
                 key={user.id}
-                className={`chat-search__item ${activeUserID === user.id ? "is-active" : ""}`}
+                className={`user-list-item ${activeUserID === user.id ? "active" : ""}`}
                 onClick={() => onStartConversation(user)}
                 type="button"
               >
-                <Avatar alt={user.username} src={user.profile_picture_url} />
-                <span className="chat-list__copy">
-                  <strong>@{user.username}</strong>
-                  <span>Start a new conversation</span>
-                </span>
+                <div className="user-avatar">
+                  {user.username.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="user-list-item__info">
+                  <span className="font-medium text-sm">@{user.username}</span>
+                  <span className="text-faint text-xs">Start conversation</span>
+                </div>
               </button>
             ))}
           </div>
         ) : null}
       </div>
 
-      {conversations.length === 0 ? (
-        <div className="chat-list__empty">
-          <p className="eyebrow">No chats yet</p>
-          <p>Search for a username above to start your first conversation.</p>
-        </div>
-      ) : null}
+      <div className="chat-sidebar__section-label">
+        Recent
+      </div>
 
-      {conversations.map((conversation) => (
-        <button
-          key={conversation.user_id}
-          className={`chat-list__item ${activeUserID === conversation.user_id ? "is-active" : ""}`}
-          onClick={() => onSelect(conversation)}
-          type="button"
-        >
-          <Avatar alt={conversation.username} src={conversation.profile_picture_url} />
-          <span className="chat-list__copy">
-            <strong>@{conversation.username}</strong>
-            <span>{conversation.last_message || "No messages yet"}</span>
-          </span>
-          <UnreadBadge count={conversation.unread_count} />
-        </button>
-      ))}
+      <div className="chat-sidebar__list">
+        {conversations.length === 0 ? (
+          <div className="empty-state" style={{ padding: '32px 20px' }}>
+            <div className="empty-state__icon">💬</div>
+            <p className="text-sm">No conversations yet. Search for someone to start chatting.</p>
+          </div>
+        ) : null}
+
+        {conversations.map((conversation) => (
+          <button
+            key={conversation.user_id}
+            className={`user-list-item ${activeUserID === conversation.user_id ? "active" : ""}`}
+            onClick={() => onSelect(conversation)}
+            type="button"
+          >
+            <div className="user-avatar">
+              {conversation.username.slice(0, 1).toUpperCase()}
+            </div>
+            <div className="user-list-item__info">
+              <div className="user-list-item__top">
+                <span className="font-medium text-sm truncate">@{conversation.username}</span>
+                {conversation.last_message_at ? (
+                  <span className="text-faint text-xs" style={{ whiteSpace: 'nowrap', marginLeft: '8px' }}>
+                    {formatRelativeDate(conversation.last_message_at).split(' ')[0]}
+                  </span>
+                ) : null}
+              </div>
+              <span className="text-muted text-xs truncate" style={{ display: 'block', marginTop: '2px' }}>
+                {conversation.last_message || "No messages yet"}
+              </span>
+            </div>
+            <UnreadBadge count={conversation.unread_count} />
+          </button>
+        ))}
+      </div>
     </aside>
   );
 }

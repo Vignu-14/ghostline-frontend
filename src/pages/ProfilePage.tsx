@@ -97,24 +97,25 @@ export function ProfilePage() {
       {!isLoading && error ? <p className="form-error">{error}</p> : null}
 
       {!isLoading && !profile && !error ? (
-        <section className="panel">
+        <section className="panel" style={{ textAlign: 'center' }}>
+          <div className="empty-state__icon">👤</div>
           <p className="eyebrow">Profile</p>
-          <h1>No user selected.</h1>
-          <p>Open a profile from search or login to view your own page.</p>
+          <h1 style={{ fontSize: '1.5rem', marginTop: '8px' }}>No user selected</h1>
+          <p className="support-copy" style={{ marginTop: '8px' }}>Open a profile from search or login to view your own page.</p>
         </section>
       ) : null}
 
       {!isLoading && profile ? (
         <>
-          <section className="panel profile-hero">
+          <section className="panel profile-hero reveal-up">
             <Avatar alt={profile.username} size="lg" src={profile.profile_picture_url} />
             <div className="profile-hero__copy">
               <p className="eyebrow">Profile</p>
               <h1>@{profile.username}</h1>
               <p className="support-copy">
                 {posts.length > 0
-                  ? `${posts.length} post${posts.length === 1 ? "" : "s"} visible on Ghostline.`
-                  : "No posts yet. Once they share photos or thoughts, they will appear here."}
+                  ? `${posts.length} post${posts.length === 1 ? "" : "s"} on Ghostline.`
+                  : "No posts yet. Once they share, their content will appear here."}
               </p>
             </div>
           </section>
@@ -122,9 +123,10 @@ export function ProfilePage() {
           <section className="feed__stack">
             {posts.length === 0 ? (
               <section className="panel feed__empty">
+                <div className="empty-state__icon">📝</div>
                 <p className="eyebrow">Nothing posted yet</p>
-                <h2>No photos or thoughts.</h2>
-                <p>This profile is ready, but there is nothing public to show yet.</p>
+                <h2 style={{ fontSize: '1.25rem', marginTop: '8px' }}>No photos or thoughts</h2>
+                <p className="support-copy" style={{ marginTop: '8px' }}>This profile is ready, but there's nothing public to show yet.</p>
               </section>
             ) : (
               posts.map((post) => (

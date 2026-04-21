@@ -3,21 +3,40 @@ import { RegisterForm } from "../components/auth/RegisterForm";
 
 export function RegisterPage() {
   return (
-    <main className="auth-page">
-      <section className="auth-page__hero">
-        <p className="eyebrow">Create your lane</p>
-        <h1>Open a clean account and start sharing in minutes.</h1>
-        <p className="support-copy">
-          Ghostline gives you a public visual feed, private one-to-one messaging, and a security model built for serious demos.
-        </p>
-      </section>
+    <main className="auth-container">
+      <div className="auth-hero">
+        <div className="auth-hero__content">
+          <div className="auth-hero__brand">Ghostline</div>
+          <p className="auth-hero__tagline">
+            Join a social space designed around trust, simplicity, and meaningful interactions.
+          </p>
+          <div className="auth-hero__features">
+            <div className="auth-hero__feature">
+              <span className="auth-hero__feature-icon">✨</span>
+              <span>Set up your account in seconds</span>
+            </div>
+            <div className="auth-hero__feature">
+              <span className="auth-hero__feature-icon">💬</span>
+              <span>Start chatting and sharing instantly</span>
+            </div>
+            <div className="auth-hero__feature">
+              <span className="auth-hero__feature-icon">🎯</span>
+              <span>No ads, no algorithms — just your network</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <section className="auth-page__panel">
-        <RegisterForm />
-        <p className="auth-page__switch">
-          Already registered? <Link to="/login">Login</Link>
-        </p>
-      </section>
+      <div className="auth-panel">
+        <div className="auth-card reveal-up">
+          <h1>Create your account</h1>
+          <p className="subtitle">It only takes a moment to get started.</p>
+          <RegisterForm />
+          <p className="auth-link">
+            Already on Ghostline? <Link to="/login">Sign in</Link>
+          </p>
+        </div>
+      </div>
     </main>
   );
 }

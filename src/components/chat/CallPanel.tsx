@@ -32,23 +32,23 @@ export function CallPanel({
       {callSession ? (
         <section className={`call-panel call-panel--${callSession.phase}`}>
           <div className="call-panel__copy">
-            <p className="eyebrow">Voice call</p>
+            <p className="eyebrow">🎙️ Voice call</p>
             <h3>@{callSession.peerUsername}</h3>
             <p className="support-copy">{callSession.status}</p>
             <div className="call-panel__meta">
-              <span>{callSession.direction === "incoming" ? "Incoming" : "Outgoing"}</span>
-              <span>{callSession.isMuted ? "Mic muted" : "Mic live"}</span>
-              {callSession.remoteMuted ? <span>@{callSession.peerUsername} muted</span> : null}
+              <span>{callSession.direction === "incoming" ? "📞 Incoming" : "📤 Outgoing"}</span>
+              <span>{callSession.isMuted ? "🔇 Muted" : "🎤 Live"}</span>
+              {callSession.remoteMuted ? <span>🔇 @{callSession.peerUsername} muted</span> : null}
             </div>
           </div>
 
           <div className="call-panel__actions">
             {callSession.phase === "incoming" ? (
               <>
-                <Button onClick={onDecline} type="button" variant="ghost">
+                <Button onClick={onDecline} type="button" variant="ghost" size="sm">
                   Decline
                 </Button>
-                <Button onClick={onAccept} type="button">
+                <Button onClick={onAccept} type="button" size="sm">
                   Accept
                 </Button>
               </>
@@ -58,12 +58,13 @@ export function CallPanel({
                   disabled={callSession.phase === "requesting_permission"}
                   onClick={onToggleMute}
                   type="button"
-                  variant="quiet"
+                  variant="ghost"
+                  size="sm"
                 >
                   {callSession.isMuted ? "Unmute" : "Mute"}
                 </Button>
-                <Button onClick={onEnd} type="button" variant="ghost">
-                  {callSession.phase === "outgoing" ? "Cancel call" : "End call"}
+                <Button onClick={onEnd} type="button" variant="danger" size="sm">
+                  {callSession.phase === "outgoing" ? "Cancel" : "End call"}
                 </Button>
               </>
             )}
@@ -76,7 +77,7 @@ export function CallPanel({
       {callNotice ? (
         <section className={`call-notice call-notice--${callNotice.tone}`}>
           <p>{callNotice.message}</p>
-          <Button onClick={onDismissNotice} type="button" variant="quiet">
+          <Button onClick={onDismissNotice} type="button" variant="ghost" size="sm">
             Dismiss
           </Button>
         </section>

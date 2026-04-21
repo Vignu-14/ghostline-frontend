@@ -3,11 +3,14 @@ import { ChatList } from "../components/chat/ChatList";
 import { ChatWindow } from "../components/chat/ChatWindow";
 import { useAuth } from "../hooks/useAuth";
 import { useAudioCall } from "../hooks/useAudioCall";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { useWebSocket } from "../hooks/useWebSocket";
 import * as chatService from "../services/chatService";
 import type { Conversation, DeleteMode, Message } from "../types/message";
 import type { UserSearchResult } from "../types/user";
 import { getErrorMessage } from "../utils/errorHandler";
+import { formatRelativeDate } from "../utils/formatDate";
+import { playNotificationSound } from "../utils/audio";
 
 export function ChatPage() {
   const { user } = useAuth();
@@ -18,6 +21,8 @@ export function ChatPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isOnline = useOnlineStatus();
   const socket = useWebSocket(Boolean(user));
   const activeConversationUsername = activeConversation?.username;
 
@@ -61,6 +66,11 @@ export function ChatPage() {
   if (!user) {
     return null;
   }
+
+  const totalUnread = conversations.reduce((count, conversation) => count + conversation.unread_count, 0);
+  const latestActivity = activeConversation?.last_message_at || conversations[0]?.last_message_at || "";
+  const connectionTone = !isOnline ? "offline" : socket.isConnected ? "live" : "warming";
+  const connectionLabel = !isOnline ? "Offline" : socket.isConnected ? "Live sync" : "Reconnecting";
 
   async function loadMessagesForConversation(conversationUserID: string, showErrors = true) {
     try {
@@ -185,6 +195,10 @@ export function ChatPage() {
     const message = latestEvent.payload as Message;
     const conversationUserID = message.sender_id === user.id ? message.receiver_id : message.sender_id;
 
+    if (message.sender_id !== user.id) {
+      playNotificationSound();
+    }
+
     setConversations((current) =>
       current.map((conversation) =>
         conversation.user_id === conversationUserID
@@ -240,30 +254,36 @@ export function ChatPage() {
       return;
     }
 
-    const response = await chatService.sendMessage({
-      receiver_id: activeConversation.user_id,
-      content,
-    });
+    try {
+      const response = await chatService.sendMessage({
+        receiver_id: activeConversation.user_id,
+        content,
+      });
 
-    setMessages((current) =>
-      current.some((message) => message.id === response.message.id)
-        ? current
-        : [...current, response.message],
-    );
-    setConversations((current) => {
-      const updated = current.map((conversation) =>
-        conversation.user_id === activeConversation.user_id
-          ? {
-              ...conversation,
-              last_message: response.message.content,
-              last_message_at: response.message.created_at,
-            }
-          : conversation,
+      setMessages((current) =>
+        current.some((message) => message.id === response.message.id)
+          ? current
+          : [...current, response.message],
       );
+      setConversations((current) => {
+        const updated = current.map((conversation) =>
+          conversation.user_id === activeConversation.user_id
+            ? {
+                ...conversation,
+                last_message: response.message.content,
+                last_message_at: response.message.created_at,
+              }
+            : conversation,
+        );
 
-      return updated;
-    });
-    await loadConversations(activeConversation.user_id);
+        return updated;
+      });
+      await loadConversations(activeConversation.user_id);
+    } catch (sendError) {
+      const nextError = getErrorMessage(sendError, "Unable to send the message.");
+      setError(nextError);
+      throw new Error(nextError);
+    }
   }
 
   async function handleDeleteMessages(messageIDs: string[], mode: DeleteMode) {
@@ -315,6 +335,7 @@ export function ChatPage() {
     setMessages([]);
     setSearchQuery("");
     setSearchResults([]);
+    setIsSidebarOpen(false);
     setConversations((current) =>
       current.some((conversation) => conversation.user_id === selectedUser.id)
         ? current
@@ -322,36 +343,41 @@ export function ChatPage() {
     );
   }
 
+  function handleSelectConversation(conversation: Conversation) {
+    setActiveConversation(conversation);
+    setIsSidebarOpen(false);
+  }
+
   return (
-    <main className="page page--chat">
-      <section className="page-header">
-        <p className="eyebrow">Realtime direct messages</p>
-        <h1>Stay in the line without breaking the flow.</h1>
-        <p className="support-copy">
-          {socket.isConnected ? "Live connection active." : "Socket reconnecting or waiting to connect."}
-        </p>
-      </section>
+    <main className="layout-main layout-main--chat">
+      <div
+        className={`chat-sidebar-overlay ${isSidebarOpen ? "chat-sidebar-overlay--visible" : ""}`}
+        onClick={() => setIsSidebarOpen(false)}
+      />
 
-      {error ? <p className="form-error">{error}</p> : null}
+      <div className="chat-layout">
 
-      <section className="chat-layout">
         <ChatList
           activeUserID={activeConversation?.user_id}
           conversations={conversations}
-          onSelect={setActiveConversation}
+          onSelect={handleSelectConversation}
           onSearchChange={setSearchQuery}
           onStartConversation={handleStartConversation}
           isSearching={isSearching}
           searchQuery={searchQuery}
           searchResults={searchResults}
+          isOpen={isSidebarOpen}
         />
         <ChatWindow
           callNotice={callNotice}
           callSession={callSession}
+          conversationLastActivity={activeConversation?.last_message_at}
           conversationUserID={activeConversation?.user_id}
           currentUserID={user.id}
           disabled={!activeConversation}
+          isOnline={isOnline}
           messages={messages}
+          messageCount={messages.length}
           onAcceptCall={acceptIncomingCall}
           onDeclineCall={declineIncomingCall}
           onDismissCallNotice={dismissCallNotice}
@@ -361,10 +387,12 @@ export function ChatPage() {
           onSend={handleSend}
           onStartCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername)}
           onToggleMute={toggleMute}
+          onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
           remoteAudioRef={remoteAudioRef}
+          socketConnected={socket.isConnected}
           title={activeConversation ? `@${activeConversation.username}` : "Choose a conversation"}
         />
-      </section>
+      </div>
     </main>
   );
 }

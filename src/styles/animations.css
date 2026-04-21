@@ -1,9 +1,13 @@
+/* ═══════════════════════════════════════════════════════
+   Ghostline Animations — Lightweight CSS Only
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Page Reveal ── */
 @keyframes reveal-up {
   from {
     opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(20px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -11,9 +15,179 @@
 }
 
 .reveal-up {
-  animation: reveal-up 720ms ease both;
+  animation: reveal-up 500ms var(--ease-out) both;
 }
 
 .reveal-up-delay {
-  animation: reveal-up 900ms ease both;
+  animation: reveal-up 600ms var(--ease-out) 100ms both;
+}
+
+.reveal-up-delay-2 {
+  animation: reveal-up 600ms var(--ease-out) 200ms both;
+}
+
+/* ── Fade In ── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.fade-in {
+  animation: fade-in 400ms var(--ease-out) both;
+}
+
+/* ── Slide In from Left ── */
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.slide-in-left {
+  animation: slide-in-left 350ms var(--ease-out) both;
+}
+
+/* ── Slide In from Right ── */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ── Message Pop (new message bubble) ── */
+@keyframes message-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  60% {
+    transform: scale(1.02) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.message-pop {
+  animation: message-pop 350ms var(--ease-spring) both;
+}
+
+/* ── Send Pulse (send button) ── */
+@keyframes send-pulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* ── Skeleton Shimmer ── */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-muted) 25%,
+    var(--bg-strong) 37%,
+    var(--bg-muted) 63%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-line {
+  height: 14px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+}
+
+.skeleton-line--short {
+  width: 60%;
+}
+
+.skeleton-line--medium {
+  width: 80%;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+/* ── Pulse Dot (online indicator) ── */
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+/* ── Glow Pulse (unread badge) ── */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--accent-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* ── Spinner ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Shake (error) ── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-4px); }
+  40%      { transform: translateX(4px); }
+  60%      { transform: translateX(-3px); }
+  80%      { transform: translateX(3px); }
+}
+
+.shake {
+  animation: shake 400ms ease;
+}
+
+/* ── Scale Pop (like button) ── */
+@keyframes scale-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* ── Float (hero decorations) ── */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

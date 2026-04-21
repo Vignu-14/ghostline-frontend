@@ -32,12 +32,26 @@ export function LoginForm() {
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
-      <Input label="Username" value={username} onChange={(event) => setUsername(event.target.value)} />
-      <Input label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-      {error ? <p className="form-error">{error}</p> : null}
-      <Button disabled={isSubmitting} type="submit">
-        {isSubmitting ? "Signing in..." : "Sign in"}
-      </Button>
+      <Input
+        label="Username"
+        placeholder="Enter your username"
+        value={username}
+        onChange={(event) => setUsername(event.target.value)}
+        autoFocus
+      />
+      <Input
+        label="Password"
+        type="password"
+        placeholder="Enter your password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+      />
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      <div style={{ marginTop: '8px' }}>
+        <Button disabled={isSubmitting || !username.trim() || !password} type="submit" style={{ width: '100%' }}>
+          {isSubmitting ? "Signing in..." : "Sign in"}
+        </Button>
+      </div>
     </form>
   );
 }

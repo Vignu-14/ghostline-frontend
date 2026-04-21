@@ -3,21 +3,40 @@ import { LoginForm } from "../components/auth/LoginForm";
 
 export function LoginPage() {
   return (
-    <main className="auth-page">
-      <section className="auth-page__hero">
-        <p className="eyebrow">Welcome back</p>
-        <h1>Step back into the private side of the feed.</h1>
-        <p className="support-copy">
-          Your session lives in secure cookies, your messages land in realtime, and admin actions stay audited.
-        </p>
-      </section>
+    <main className="auth-container">
+      <div className="auth-hero">
+        <div className="auth-hero__content">
+          <div className="auth-hero__brand">Ghostline</div>
+          <p className="auth-hero__tagline">
+            Where real conversations happen. Private, fast, and built for genuine connection.
+          </p>
+          <div className="auth-hero__features">
+            <div className="auth-hero__feature">
+              <span className="auth-hero__feature-icon">🔒</span>
+              <span>Private by design — your data stays yours</span>
+            </div>
+            <div className="auth-hero__feature">
+              <span className="auth-hero__feature-icon">⚡</span>
+              <span>Real-time messaging with voice calling</span>
+            </div>
+            <div className="auth-hero__feature">
+              <span className="auth-hero__feature-icon">🌐</span>
+              <span>Share thoughts and moments with your network</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <section className="auth-page__panel">
-        <LoginForm />
-        <p className="auth-page__switch">
-          Need an account? <Link to="/register">Register</Link>
-        </p>
-      </section>
+      <div className="auth-panel">
+        <div className="auth-card reveal-up">
+          <h1>Welcome back</h1>
+          <p className="subtitle">Sign in to continue where you left off.</p>
+          <LoginForm />
+          <p className="auth-link">
+            Don't have an account? <Link to="/register">Create one free</Link>
+          </p>
+        </div>
+      </div>
     </main>
   );
 }

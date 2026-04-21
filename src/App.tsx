@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { HomePage } from "./pages/HomePage";
@@ -12,27 +12,32 @@ import { Footer } from "./components/layout/Footer";
 import { ProtectedRoute } from "./components/common/ProtectedRoute";
 
 function AppShell() {
+  const location = useLocation();
+  const isChatPage = location.pathname === "/chat";
+
   return (
-    <>
+    <div className="layout-app">
       <Navbar />
-      <Routes>
-        <Route element={<HomePage />} path="/" />
-        <Route element={<LoginPage />} path="/login" />
-        <Route element={<RegisterPage />} path="/register" />
-        <Route element={<ProfilePage />} path="/u/:username" />
-        <Route element={<ProtectedRoute />}>
-          <Route element={<ChatPage />} path="/chat" />
-          <Route element={<ProfilePage />} path="/profile" />
-        </Route>
-        <Route element={<ProtectedRoute requireAdmin />}>
-          <Route element={<AdminPage />} path="/admin" />
-        </Route>
-        <Route element={<Navigate replace to="/" />} path="/home" />
-        <Route element={<NotFoundPage />} path="*" />
-      </Routes>
-      <Footer />
-      <MobileNav />
-    </>
+      <main className={isChatPage ? "layout-main layout-main--chat" : "layout-main"}>
+        <Routes>
+          <Route element={<HomePage />} path="/" />
+          <Route element={<LoginPage />} path="/login" />
+          <Route element={<RegisterPage />} path="/register" />
+          <Route element={<ProfilePage />} path="/u/:username" />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<ChatPage />} path="/chat" />
+            <Route element={<ProfilePage />} path="/profile" />
+          </Route>
+          <Route element={<ProtectedRoute requireAdmin />}>
+            <Route element={<AdminPage />} path="/admin" />
+          </Route>
+          <Route element={<Navigate replace to="/" />} path="/home" />
+          <Route element={<NotFoundPage />} path="*" />
+        </Routes>
+      </main>
+      {!isChatPage && <Footer />}
+      {!isChatPage && <MobileNav />}
+    </div>
   );
 }
 

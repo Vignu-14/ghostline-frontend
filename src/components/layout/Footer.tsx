@@ -33,7 +33,7 @@ export function Footer() {
     <footer className="site-footer">
       <div className="site-footer__copy">
         <p className="eyebrow">Ghostline</p>
-        <p>Private social, realtime chat, and audited admin access.</p>
+        <p>Real connections through a cleaner social experience. No algorithms, just genuine conversations.</p>
       </div>
 
       <nav aria-label="Social links" className="site-footer__socials">

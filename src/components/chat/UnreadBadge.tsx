@@ -7,5 +7,9 @@ export function UnreadBadge({ count }: UnreadBadgeProps) {
     return null;
   }
 
-  return <span className="badge">{count}</span>;
+  return (
+    <span className="badge badge--glowing">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
 }

@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import "./styles/variables.css";
 import "./styles/animations.css";
 import "./styles/index.css";
@@ -14,8 +15,10 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <ErrorBoundary>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ThemeProvider>
   </ErrorBoundary>,
 );

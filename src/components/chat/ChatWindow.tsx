@@ -3,28 +3,32 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../common/Button";
 import type { CallNotice, CallSession } from "../../types/call";
 import type { DeleteMode, Message } from "../../types/message";
+import { formatRelativeDate } from "../../utils/formatDate";
 import { CallPanel } from "./CallPanel";
 import { ChatMessage } from "./ChatMessage";
 import { MessageInput } from "./MessageInput";
 
 type DeleteDialogState =
   | {
-      kind: "messages";
-      description: string;
-      messageIDs: string[];
-      title: string;
-    }
+    kind: "messages";
+    description: string;
+    messageIDs: string[];
+    title: string;
+  }
   | {
-      kind: "clear";
-      description: string;
-      title: string;
-    };
+    kind: "clear";
+    description: string;
+    title: string;
+  };
 
 type ChatWindowProps = {
+  conversationLastActivity?: string;
   conversationUserID?: string;
   currentUserID: string;
   disabled?: boolean;
+  isOnline: boolean;
   messages: Message[];
+  messageCount: number;
   onAcceptCall: () => void;
   onDeclineCall: () => void;
   onDismissCallNotice: () => void;
@@ -35,16 +39,21 @@ type ChatWindowProps = {
   onSend: (content: string) => Promise<void>;
   onStartCall: () => Promise<void> | void;
   onToggleMute: () => void;
+  onToggleSidebar: () => void;
   callNotice: CallNotice | null;
   callSession: CallSession | null;
   remoteAudioRef: RefObject<HTMLAudioElement | null>;
+  socketConnected: boolean;
 };
 
 export function ChatWindow({
+  conversationLastActivity,
   conversationUserID,
   currentUserID,
   disabled,
+  isOnline,
   messages,
+  messageCount,
   onAcceptCall,
   onDeclineCall,
   onDismissCallNotice,
@@ -55,9 +64,11 @@ export function ChatWindow({
   onSend,
   onStartCall,
   onToggleMute,
+  onToggleSidebar,
   callNotice,
   callSession,
   remoteAudioRef,
+  socketConnected,
 }: ChatWindowProps) {
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(null);
@@ -65,6 +76,8 @@ export function ChatWindow({
   const [isWorking, setIsWorking] = useState(false);
   const [localError, setLocalError] = useState("");
   const [selectedMessageIDs, setSelectedMessageIDs] = useState<string[]>([]);
+  const connectionTone = !isOnline ? "offline" : socketConnected ? "live" : "warming";
+  const connectionLabel = !isOnline ? "You are offline" : socketConnected ? "Connected" : "Reconnecting...";
 
   useEffect(() => {
     if (!messageListRef.current) {
@@ -163,29 +176,52 @@ export function ChatWindow({
   }
 
   return (
-    <section className="chat-window">
-      <header className="chat-window__header chat-window__header--split">
-        <div>
-          <p className="eyebrow">Direct line</p>
-          <h2>{title}</h2>
+    <section className="chat-main">
+      <header className="chat-header">
+        <div className="chat-header__left">
+          <button
+            className="mobile-sidebar-toggle"
+            onClick={onToggleSidebar}
+            type="button"
+            aria-label="Toggle conversations"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div className="chat-header__info">
+            <h2>{title}</h2>
+            <div className="chat-header__meta">
+              <span className={`chat-header__status chat-header__status--${connectionTone}`}>
+                <span className={`status-dot status-dot--${connectionTone}`} />
+                {connectionLabel}
+              </span>
+              {messageCount > 0 && (
+                <span className="text-faint text-xs">• {messageCount} messages</span>
+              )}
+            </div>
+          </div>
         </div>
 
         {!disabled ? (
-          <div className="chat-window__toolbar">
+          <div className="chat-header__actions">
             {isSelectionMode ? (
               <>
-                <span className="support-copy">
+                <span className="text-muted text-xs" style={{ marginRight: '4px' }}>
                   {selectedMessageIDs.length > 0
                     ? `${selectedMessageIDs.length} selected`
-                    : "Tap messages to select"}
+                    : "Tap to select"}
                 </span>
                 <Button
                   disabled={selectedMessageIDs.length === 0 || isWorking}
                   onClick={openSelectedDeleteDialog}
                   type="button"
-                  variant="ghost"
+                  variant="outline"
+                  size="sm"
                 >
-                  Delete selected
+                  Delete
                 </Button>
                 <Button
                   disabled={isWorking}
@@ -196,28 +232,29 @@ export function ChatWindow({
                     setSelectedMessageIDs([]);
                   }}
                   type="button"
-                  variant="quiet"
+                  variant="ghost"
+                  size="sm"
                 >
                   Cancel
                 </Button>
               </>
             ) : (
               <>
-                <Button disabled={isWorking} onClick={() => setIsSelectionMode(true)} type="button" variant="quiet">
+                <Button disabled={isWorking} onClick={() => setIsSelectionMode(true)} type="button" variant="ghost" size="sm">
                   Select
                 </Button>
                 <Button
-                  className="chat-window__call-trigger"
                   disabled={isWorking || !conversationUserID || Boolean(callSession)}
                   onClick={() => void onStartCall()}
                   type="button"
-                  variant="quiet"
+                  variant="ghost"
+                  size="sm"
                 >
                   <CallIcon />
-                  <span>{callSession ? "Call active" : "Call"}</span>
+                  <span>{callSession ? "In call" : "Call"}</span>
                 </Button>
-                <Button disabled={isWorking} onClick={openClearDialog} type="button" variant="ghost">
-                  Clear chat
+                <Button disabled={isWorking} onClick={openClearDialog} type="button" variant="outline" size="sm">
+                  Clear
                 </Button>
               </>
             )}
@@ -225,7 +262,12 @@ export function ChatWindow({
         ) : null}
       </header>
 
-      {localError ? <p className="form-error">{localError}</p> : null}
+      {localError ? (
+        <div style={{ padding: '8px 24px' }}>
+          <p className="form-error">{localError}</p>
+        </div>
+      ) : null}
+
       <CallPanel
         callNotice={callNotice}
         callSession={callSession && callSession.peerID === conversationUserID ? callSession : null}
@@ -237,65 +279,67 @@ export function ChatWindow({
         remoteAudioRef={remoteAudioRef}
       />
 
-      <div className="chat-window__messages" ref={messageListRef}>
+      <div className="chat-messages" ref={messageListRef}>
         {disabled ? (
-          <div className="chat-window__empty">
-            <p className="eyebrow">No chat selected</p>
-            <p>Pick an existing conversation or search for a username to start chatting.</p>
+          <div className="empty-state">
+            <div className="empty-state__icon">💬</div>
+            <h3>No chat selected</h3>
+            <p>Pick a conversation from the sidebar or search for someone new.</p>
           </div>
         ) : null}
 
         {!disabled && messages.length === 0 ? (
-          <div className="chat-window__empty">
-            <p className="eyebrow">Conversation ready</p>
-            <p>Send the first message to start this chat.</p>
+          <div className="empty-state">
+            <div className="empty-state__icon">👋</div>
+            <h3>Start the conversation</h3>
+            <p>Send the first message — say hello!</p>
           </div>
         ) : null}
 
         {!disabled
           ? messages.map((message) => (
-              <ChatMessage
-                key={message.id}
-                isOwn={message.sender_id === currentUserID}
-                isSelected={selectedMessageIDs.includes(message.id)}
-                isSelectionMode={isSelectionMode}
-                message={message}
-                onToggleSelect={toggleSelection}
-              />
-            ))
+            <ChatMessage
+              key={message.id}
+              isOwn={message.sender_id === currentUserID}
+              isSelected={selectedMessageIDs.includes(message.id)}
+              isSelectionMode={isSelectionMode}
+              message={message}
+              onToggleSelect={toggleSelection}
+            />
+          ))
           : null}
       </div>
 
       <MessageInput disabled={disabled || isWorking} onSend={onSend} />
 
       {deleteDialog ? (
-        <div className="chat-dialog-backdrop" role="presentation">
-          <div aria-modal="true" className="chat-dialog" role="dialog">
-            <p className="eyebrow">
+        <div className="chat-dialog-overlay">
+          <div className="chat-dialog">
+            <p className="chat-dialog__label">
               {deleteDialog.kind === "clear" ? "Clear conversation" : "Delete options"}
             </p>
             <h3>{deleteDialog.title}</h3>
-            <p className="support-copy">{deleteDialog.description}</p>
+            <p>{deleteDialog.description}</p>
 
             <div className="chat-dialog__actions">
-              <Button disabled={isWorking} onClick={() => setDeleteDialog(null)} type="button" variant="quiet">
+              <Button disabled={isWorking} onClick={() => setDeleteDialog(null)} type="button" variant="ghost" size="sm">
                 Cancel
               </Button>
               {deleteDialog.kind === "messages" ? (
-                <Button disabled={isWorking} onClick={() => void handleDeleteConfirm("everyone")} type="button" variant="ghost">
+                <Button disabled={isWorking} onClick={() => void handleDeleteConfirm("everyone")} type="button" variant="outline" size="sm">
                   Delete for everyone
                 </Button>
               ) : null}
               {deleteDialog.kind === "messages" ? (
-                <Button disabled={isWorking} onClick={() => void handleDeleteConfirm("me")} type="button">
+                <Button disabled={isWorking} onClick={() => void handleDeleteConfirm("me")} type="button" variant="primary" size="sm">
                   Delete for me
                 </Button>
               ) : (
                 <>
-                  <Button disabled={isWorking} onClick={() => void handleClearConfirm("everyone")} type="button" variant="ghost">
+                  <Button disabled={isWorking} onClick={() => void handleClearConfirm("everyone")} type="button" variant="outline" size="sm">
                     Delete for everyone
                   </Button>
-                  <Button disabled={isWorking} onClick={() => void handleClearConfirm("me")} type="button">
+                  <Button disabled={isWorking} onClick={() => void handleClearConfirm("me")} type="button" variant="primary" size="sm">
                     Delete for me
                   </Button>
                 </>
@@ -310,8 +354,8 @@ export function ChatWindow({
 
 function CallIcon() {
   return (
-    <svg aria-hidden="true" className="chat-window__call-icon" viewBox="0 0 24 24">
-      <path d="M6.6 10.8c1.9 3.7 4.9 6.7 8.6 8.6l2.9-2.9a1 1 0 0 1 1-.24c1.02.34 2.1.52 3.2.52a1 1 0 0 1 1 1V22a1 1 0 0 1-1 1C10.42 23 1 13.58 1 2a1 1 0 0 1 1-1h4.22a1 1 0 0 1 1 1c0 1.1.18 2.18.52 3.2a1 1 0 0 1-.24 1z" />
+    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
     </svg>
   );
 }

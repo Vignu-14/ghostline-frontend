@@ -16,36 +16,37 @@ export function ChatMessage({
   message,
   onToggleSelect,
 }: ChatMessageProps) {
-  const bubbleClassName = [
-    "chat-message",
-    isOwn ? "chat-message--sent" : "chat-message--received",
-    message.deleted_for_everyone ? "chat-message--deleted" : "",
-    isSelectionMode ? "chat-message--selectable" : "",
-    isSelected ? "is-selected" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
 
-  const bubbleContent = (
-    <p className={message.deleted_for_everyone ? "chat-message__deleted-copy" : ""}>{message.content}</p>
-  );
+  const bubbleClass = isOwn ? "chat-bubble--own" : "chat-bubble--other";
+  const wrapperClass = isOwn ? "chat-bubble-wrapper--own" : "chat-bubble-wrapper--other";
 
   return (
-    <div className={`chat-message-row ${isOwn ? "chat-message-row--sent" : "chat-message-row--received"}`}>
-      {isOwn ? <span className="chat-message__time">{formatChatTime(message.created_at)}</span> : null}
-      {isSelectionMode ? (
-        <button
-          aria-pressed={isSelected}
-          className={`${bubbleClassName} chat-message__button`}
-          onClick={() => onToggleSelect(message)}
-          type="button"
-        >
-          {bubbleContent}
-        </button>
-      ) : (
-        <div className={bubbleClassName}>{bubbleContent}</div>
-      )}
-      {!isOwn ? <span className="chat-message__time">{formatChatTime(message.created_at)}</span> : null}
+    <div className={`chat-bubble-wrapper ${wrapperClass}`}>
+      <div
+        className={`chat-bubble ${bubbleClass}`}
+        style={{
+          opacity: message.deleted_for_everyone ? 0.5 : 1,
+          fontStyle: message.deleted_for_everyone ? 'italic' : 'normal',
+          outline: isSelected ? '2px solid var(--accent)' : 'none',
+          outlineOffset: '2px',
+          cursor: isSelectionMode ? 'pointer' : 'default',
+          borderRadius: isSelected ? '18px' : undefined,
+        }}
+        onClick={isSelectionMode ? () => onToggleSelect(message) : undefined}
+      >
+        {message.deleted_for_everyone ? "This message was deleted" : message.content}
+      </div>
+      <div className="chat-meta">
+        <span>{formatChatTime(message.created_at)}</span>
+        {isOwn && message.is_read && !message.deleted_for_everyone ? (
+          <span className="chat-meta__seen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Seen
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

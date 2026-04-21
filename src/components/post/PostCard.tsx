@@ -14,7 +14,7 @@ type PostCardProps = {
 
 export function PostCard({ canDelete, onDelete, post, onLikeToggle }: PostCardProps) {
   return (
-    <article className="post-card">
+    <article className="post-card reveal-up">
       <header className="post-card__header">
         <Link className="post-card__identity post-card__identity--link" to={`/u/${post.user.username}`}>
           <Avatar alt={post.user.username} src={post.user.profile_picture_url} />
@@ -30,7 +30,7 @@ export function PostCard({ canDelete, onDelete, post, onLikeToggle }: PostCardPr
             onToggle={() => onLikeToggle?.(post)}
           />
           {canDelete ? (
-            <Button onClick={() => onDelete?.(post)} type="button" variant="quiet">
+            <Button onClick={() => onDelete?.(post)} type="button" variant="ghost" size="sm">
               Delete
             </Button>
           ) : null}
@@ -42,6 +42,7 @@ export function PostCard({ canDelete, onDelete, post, onLikeToggle }: PostCardPr
           alt={post.caption || `${post.user.username}'s post`}
           className="post-card__image"
           src={post.image_url}
+          loading="lazy"
         />
       ) : null}
 

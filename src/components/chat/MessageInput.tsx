@@ -1,5 +1,4 @@
-import { useState, type FormEvent } from "react";
-import { Button } from "../common/Button";
+import { useState, useRef, useEffect, type FormEvent } from "react";
 
 type MessageInputProps = {
   disabled?: boolean;
@@ -8,28 +7,61 @@ type MessageInputProps = {
 
 export function MessageInput({ disabled, onSend }: MessageInputProps) {
   const [content, setContent] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!disabled && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [disabled]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!content.trim()) {
+    const nextContent = content.trim();
+
+    if (!nextContent || disabled || isSending) {
       return;
     }
 
-    await onSend(content);
-    setContent("");
+    setIsSending(true);
+
+    try {
+      await onSend(nextContent);
+      setContent("");
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    } catch {
+      return;
+    } finally {
+      setIsSending(false);
+    }
   }
 
   return (
-    <form className="message-input" onSubmit={handleSubmit}>
-      <input
-        disabled={disabled}
-        onChange={(event) => setContent(event.target.value)}
-        placeholder="Write a message..."
-        value={content}
-      />
-      <Button disabled={disabled || !content.trim()} type="submit">
-        Send
-      </Button>
-    </form>
+    <div className="chat-input-dock">
+      <form className="chat-input-form" onSubmit={handleSubmit}>
+        <input
+          className="chat-input-field"
+          ref={inputRef}
+          disabled={disabled || isSending}
+          onChange={(event) => setContent(event.target.value)}
+          placeholder={disabled ? "Select a conversation..." : "Type your message..."}
+          value={content}
+        />
+        <button 
+          className="chat-send-btn" 
+          disabled={disabled || isSending || !content.trim()} 
+          type="submit"
+          aria-label="Send message"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </div>
   );
 }
