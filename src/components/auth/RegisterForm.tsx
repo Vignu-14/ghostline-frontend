@@ -16,7 +16,19 @@ export function RegisterForm() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const canSubmit = form.username.trim() && form.email.trim() && form.password;
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
+
+  const passwordCriteria = {
+    length: form.password.length >= 8,
+    hasUpper: /[A-Z]/.test(form.password),
+    hasLower: /[a-z]/.test(form.password),
+    hasNumber: /\d/.test(form.password),
+    hasSpecial: /[!@#$%^&*]/.test(form.password),
+  };
+
+  const isPasswordValid = Object.values(passwordCriteria).every(Boolean);
+
+  const canSubmit = form.username.trim() && isEmailValid && isPasswordValid;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,20 +54,54 @@ export function RegisterForm() {
         onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
         autoFocus
       />
-      <Input
-        label="Email"
-        type="email"
-        placeholder="your@email.com"
-        value={form.email}
-        onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-      />
-      <Input
-        label="Password"
-        type="password"
-        placeholder="Create a strong password"
-        value={form.password}
-        onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-      />
+      <div style={{ marginBottom: '16px' }}>
+        <Input
+          label="Email"
+          type="email"
+          placeholder="your@email.com"
+          value={form.email}
+          onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+        />
+        {form.email && !isEmailValid && (
+          <span className="email-warning" role="alert">
+            Please enter a valid email address format.
+          </span>
+        )}
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <Input
+          label="Password"
+          type="password"
+          placeholder="Create a strong password"
+          value={form.password}
+          onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+        />
+        {form.password && (
+          <ul className="password-checklist">
+            <li className={`password-checklist__item ${passwordCriteria.length ? 'password-checklist__item--met' : ''}`}>
+              <span className="password-checklist__icon">{passwordCriteria.length ? '✓' : ''}</span>
+              8+ characters
+            </li>
+            <li className={`password-checklist__item ${passwordCriteria.hasUpper ? 'password-checklist__item--met' : ''}`}>
+              <span className="password-checklist__icon">{passwordCriteria.hasUpper ? '✓' : ''}</span>
+              At least one uppercase letter
+            </li>
+            <li className={`password-checklist__item ${passwordCriteria.hasLower ? 'password-checklist__item--met' : ''}`}>
+              <span className="password-checklist__icon">{passwordCriteria.hasLower ? '✓' : ''}</span>
+              At least one lowercase letter
+            </li>
+            <li className={`password-checklist__item ${passwordCriteria.hasNumber ? 'password-checklist__item--met' : ''}`}>
+              <span className="password-checklist__icon">{passwordCriteria.hasNumber ? '✓' : ''}</span>
+              At least one number
+            </li>
+            <li className={`password-checklist__item ${passwordCriteria.hasSpecial ? 'password-checklist__item--met' : ''}`}>
+              <span className="password-checklist__icon">{passwordCriteria.hasSpecial ? '✓' : ''}</span>
+              One special character (!@#$%^&*)
+            </li>
+          </ul>
+        )}
+      </div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       <div style={{ marginTop: '8px' }}>
         <Button disabled={isSubmitting || !canSubmit} type="submit" style={{ width: '100%' }}>
