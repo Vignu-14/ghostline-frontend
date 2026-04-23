@@ -11,6 +11,7 @@ export interface Message {
   id: string;
   sender_id: string;
   receiver_id: string;
+  sender_avatar_url?: string | null;
   content: string;
   is_read: boolean;
   created_at: string;

@@ -37,12 +37,15 @@ type ChatWindowProps = {
   onDeleteMessages: (messageIDs: string[], mode: DeleteMode) => Promise<void>;
   title: string;
   onSend: (content: string) => Promise<void>;
-  onStartCall: () => Promise<void> | void;
+  onStartAudioCall: () => Promise<void> | void;
+  onStartVideoCall: () => Promise<void> | void;
   onToggleMute: () => void;
+  onToggleVideo: () => void;
   onToggleSidebar: () => void;
   callNotice: CallNotice | null;
   callSession: CallSession | null;
-  remoteAudioRef: RefObject<HTMLAudioElement | null>;
+  remoteVideoRef: RefObject<HTMLVideoElement | null>;
+  localVideoRef: RefObject<HTMLVideoElement | null>;
   socketConnected: boolean;
 };
 
@@ -62,12 +65,15 @@ export function ChatWindow({
   onDeleteMessages,
   title,
   onSend,
-  onStartCall,
+  onStartAudioCall,
+  onStartVideoCall,
   onToggleMute,
+  onToggleVideo,
   onToggleSidebar,
   callNotice,
   callSession,
-  remoteAudioRef,
+  remoteVideoRef,
+  localVideoRef,
   socketConnected,
 }: ChatWindowProps) {
   const messageListRef = useRef<HTMLDivElement | null>(null);
@@ -245,13 +251,23 @@ export function ChatWindow({
                 </Button>
                 <Button
                   disabled={isWorking || !conversationUserID || Boolean(callSession)}
-                  onClick={() => void onStartCall()}
+                  onClick={() => void onStartAudioCall()}
                   type="button"
                   variant="ghost"
                   size="sm"
+                  aria-label="Audio call"
                 >
                   <CallIcon />
-                  <span>{callSession ? "In call" : "Call"}</span>
+                </Button>
+                <Button
+                  disabled={isWorking || !conversationUserID || Boolean(callSession)}
+                  onClick={() => void onStartVideoCall()}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Video call"
+                >
+                  <VideoIcon />
                 </Button>
                 <Button disabled={isWorking} onClick={openClearDialog} type="button" variant="outline" size="sm">
                   Clear
@@ -276,7 +292,9 @@ export function ChatWindow({
         onDismissNotice={onDismissCallNotice}
         onEnd={onEndCall}
         onToggleMute={onToggleMute}
-        remoteAudioRef={remoteAudioRef}
+        onToggleVideo={onToggleVideo}
+        remoteVideoRef={remoteVideoRef}
+        localVideoRef={localVideoRef}
       />
 
       <div className="chat-messages" ref={messageListRef}>
@@ -354,8 +372,17 @@ export function ChatWindow({
 
 function CallIcon() {
   return (
-    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+    </svg>
+  );
+}
+
+function VideoIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="23 7 16 12 23 17 23 7"></polygon>
+      <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
     </svg>
   );
 }

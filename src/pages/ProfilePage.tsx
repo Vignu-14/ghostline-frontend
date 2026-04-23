@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PostCard } from "../components/post/PostCard";
-import { Avatar } from "../components/common/Avatar";
+import { ProfileHeader } from "../components/profile/ProfileHeader";
+import { AvatarUploadModal } from "../components/profile/AvatarUploadModal";
 import { Spinner } from "../components/common/Spinner";
 import { useAuth } from "../hooks/useAuth";
 import * as postService from "../services/postService";
@@ -12,12 +13,24 @@ import { getErrorMessage } from "../utils/errorHandler";
 
 export function ProfilePage() {
   const { username: routeUsername } = useParams();
-  const { user } = useAuth();
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const { user, setUser } = useAuth();
   const username = routeUsername || user?.username || "";
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleAvatarClick = () => {
+    if (user?.id === profile?.id) {
+      setIsAvatarModalOpen(true);
+    }
+  };
+
+  const handleAvatarSuccess = (newUrl: string) => {
+    setUser((prev) => (prev ? { ...prev, profile_picture_url: newUrl } : null));
+    setProfile((prev) => (prev ? { ...prev, profile_picture_url: newUrl } : null));
+  };
 
   useEffect(() => {
     if (!username) {
@@ -107,18 +120,19 @@ export function ProfilePage() {
 
       {!isLoading && profile ? (
         <>
-          <section className="panel profile-hero reveal-up">
-            <Avatar alt={profile.username} size="lg" src={profile.profile_picture_url} />
-            <div className="profile-hero__copy">
-              <p className="eyebrow">Profile</p>
-              <h1>@{profile.username}</h1>
-              <p className="support-copy">
-                {posts.length > 0
-                  ? `${posts.length} post${posts.length === 1 ? "" : "s"} on Ghostline.`
-                  : "No posts yet. Once they share, their content will appear here."}
-              </p>
-            </div>
-          </section>
+          <ProfileHeader 
+            username={profile.username}
+            postCount={posts.length}
+            profilePictureUrl={profile.profile_picture_url}
+            onAvatarClick={handleAvatarClick}
+          />
+
+          {isAvatarModalOpen && (
+            <AvatarUploadModal
+              onClose={() => setIsAvatarModalOpen(false)}
+              onSuccess={handleAvatarSuccess}
+            />
+          )}
 
           <section className="feed__stack">
             {posts.length === 0 ? (

@@ -14,6 +14,7 @@ interface AuthContextValue {
   register: (input: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -71,6 +72,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         register: handleRegister,
         logout: handleLogout,
         refreshUser,
+        setUser,
       }}
     >
       {children}

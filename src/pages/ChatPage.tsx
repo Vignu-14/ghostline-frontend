@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChatList } from "../components/chat/ChatList";
 import { ChatWindow } from "../components/chat/ChatWindow";
 import { useAuth } from "../hooks/useAuth";
-import { useAudioCall } from "../hooks/useAudioCall";
+import { useCall } from "../hooks/useCall";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { useWebSocket } from "../hooks/useWebSocket";
 import * as chatService from "../services/chatService";
@@ -51,10 +51,12 @@ export function ChatPage() {
     declineIncomingCall,
     dismissCallNotice,
     endCall,
-    remoteAudioRef,
+    remoteVideoRef,
+    localVideoRef,
     startCall,
     toggleMute,
-  } = useAudioCall({
+    toggleVideo,
+  } = useCall({
     currentUserID: user?.id || "",
     currentUsername: user?.username || "",
     lastEvent: socket.lastEvent,
@@ -385,10 +387,13 @@ export function ChatPage() {
           onClearConversation={handleClearConversation}
           onDeleteMessages={handleDeleteMessages}
           onSend={handleSend}
-          onStartCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername)}
+          onStartAudioCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername, "audio")}
+          onStartVideoCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername, "video")}
           onToggleMute={toggleMute}
+          onToggleVideo={toggleVideo}
           onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
-          remoteAudioRef={remoteAudioRef}
+          remoteVideoRef={remoteVideoRef}
+          localVideoRef={localVideoRef}
           socketConnected={socket.isConnected}
           title={activeConversation ? `@${activeConversation.username}` : "Choose a conversation"}
         />

@@ -21,8 +21,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  // Generate request ID for tracing
-  const requestId = crypto.randomUUID();
+  // Generate request ID for tracing (with fallback for non-secure contexts)
+  const requestId = typeof crypto.randomUUID === 'function' 
+    ? crypto.randomUUID() 
+    : Math.random().toString(36).substring(2, 15);
   headers.set("X-Request-ID", requestId);
 
   const url = `${API_BASE_URL}${path}`;

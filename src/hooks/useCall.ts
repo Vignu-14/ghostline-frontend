@@ -6,6 +6,8 @@ import type {
   CallSession,
   CallSignalPayload,
   ICECandidatePayload,
+  CallType,
+  SessionDescriptionPayload,
 } from "../types/call";
 import type { OutgoingWebSocketMessage, WebSocketEvent } from "../types/websocket";
 
@@ -14,7 +16,7 @@ type EnsureConversationInput = {
   username?: string;
 };
 
-type UseAudioCallOptions = {
+type UseCallOptions = {
   currentUserID: string;
   currentUsername?: string;
   lastEvent: WebSocketEvent | null;
@@ -36,6 +38,7 @@ const CALL_SIGNAL_TYPES = new Set([
   "call_ice_candidate",
   "call_end",
   "call_mute_state",
+  "call_video_state",
 ]);
 
 const RTC_CONFIGURATION: RTCConfiguration = {
@@ -50,17 +53,18 @@ const RTC_CONFIGURATION: RTCConfiguration = {
 const DISCONNECTED_GRACE_MS = 8000;
 const UNANSWERED_TIMEOUT_MS = 30000;
 
-export function useAudioCall({
+export function useCall({
   currentUserID,
   currentUsername,
   lastEvent,
   onEnsureConversation,
   send,
   socketConnected,
-}: UseAudioCallOptions) {
+}: UseCallOptions) {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const unansweredTimeoutRef = useRef<number | null>(null);
   const disconnectTimeoutRef = useRef<number | null>(null);
@@ -73,11 +77,12 @@ export function useAudioCall({
   const isSettingRemoteAnswerPendingRef = useRef(false);
   const iceRestartedRef = useRef(false);
   const processedCallEventsRef = useRef<Set<string>>(new Set());
-  const pendingRemoteOfferRef = useRef<CallSignalPayload["description"] | null>(null);
+  const pendingRemoteOfferRef = useRef<SessionDescriptionPayload | null>(null);
 
   const [callNotice, setCallNotice] = useState<CallNotice | null>(null);
   const [callSession, setCallSession] = useState<CallSession | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const commitSession = useCallback((nextSession: CallSession | null) => {
     sessionRef.current = nextSession;
@@ -154,6 +159,7 @@ export function useAudioCall({
 
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
+    setLocalStream(null);
     setRemoteStream(null);
   }, [clearDisconnectTimer, clearUnansweredTimer]);
 
@@ -218,7 +224,7 @@ export function useAudioCall({
           updateSession((session) => ({
             ...session,
             phase: "active",
-            status: `In call with @${session.peerUsername}`,
+            status: `In ${session.callType} call with @${session.peerUsername}`,
           }));
           break;
         case "connecting":
@@ -270,7 +276,7 @@ export function useAudioCall({
       try {
         await peerConnection.addIceCandidate(candidate);
       } catch {
-        // Ignore stale candidates after renegotiation or hangup.
+        // Ignore stale candidates
       }
     }
   }, []);
@@ -288,7 +294,7 @@ export function useAudioCall({
         .filter((trackID): trackID is string => Boolean(trackID)),
     );
 
-    stream.getAudioTracks().forEach((track) => {
+    stream.getTracks().forEach((track) => {
       if (!existingTrackIDs.has(track.id)) {
         connection.addTrack(track, stream);
       }
@@ -314,16 +320,10 @@ export function useAudioCall({
         return;
       }
 
-      const candidateWithExtras = event.candidate as RTCIceCandidate & {
-        usernameFragment?: string | null;
-      };
-
       const candidatePayload: ICECandidatePayload = {
         candidate: event.candidate.candidate,
         sdpMid: event.candidate.sdpMid,
         sdpMLineIndex: event.candidate.sdpMLineIndex,
-        usernameFragment:
-          typeof candidateWithExtras.usernameFragment === "string" ? candidateWithExtras.usernameFragment : undefined,
       };
 
       sendSignal(
@@ -343,35 +343,38 @@ export function useAudioCall({
       setRemoteStream(nextStream);
     };
 
-    connection.onnegotiationneeded = async () => {
+    connection.onnegotiationneeded = () => {
       const current = sessionRef.current;
       if (!current || current.direction !== "outgoing") {
         return;
       }
 
-      try {
-        makingOfferRef.current = true;
-        await connection.setLocalDescription();
-        const description = connection.localDescription;
-        if (!description) {
-          return;
-        }
+      void (async () => {
+        try {
+          makingOfferRef.current = true;
+          await connection.setLocalDescription();
+          const description = connection.localDescription;
+          if (!description) {
+            return;
+          }
 
-        sendSignal({
-          type: "call_offer",
-          receiver_id: current.peerID,
-          call_id: current.callID,
-          description: {
-            type: description.type,
-            sdp: description.sdp || "",
-          },
-          username: currentUsername,
-        });
-      } catch {
-        handlePeerConnectionFailure("Unable to prepare the call offer.");
-      } finally {
-        makingOfferRef.current = false;
-      }
+          sendSignal({
+            type: "call_offer",
+            receiver_id: current.peerID,
+            call_id: current.callID,
+            call_type: current.callType,
+            description: {
+              type: description.type,
+              sdp: description.sdp || "",
+            },
+            username: currentUsername,
+          });
+        } catch {
+          handlePeerConnectionFailure("Unable to prepare the call offer.");
+        } finally {
+          makingOfferRef.current = false;
+        }
+      })();
     };
 
     connection.onconnectionstatechange = () => {
@@ -384,32 +387,18 @@ export function useAudioCall({
         return;
       }
 
-      switch (connection.iceConnectionState) {
-        case "connected":
-        case "completed":
-          iceRestartedRef.current = false;
-          break;
-        case "failed":
-          if (current.direction === "outgoing" && !iceRestartedRef.current) {
-            iceRestartedRef.current = true;
-            updateSession((session) => ({
-              ...session,
-              status: hasTurnServersRef.current
-                ? "Media path failed. Trying to reconnect through the relay..."
-                : "Media path failed. Trying one more direct reconnect...",
-            }));
-            connection.restartIce();
-            return;
-          }
+      if (connection.iceConnectionState === "failed") {
+        if (current.direction === "outgoing" && !iceRestartedRef.current) {
+          iceRestartedRef.current = true;
+          updateSession((session) => ({
+            ...session,
+            status: "Media path failed. Retrying...",
+          }));
+          connection.restartIce();
+          return;
+        }
 
-          handlePeerConnectionFailure(
-            hasTurnServersRef.current
-              ? "The call media path failed, even after trying the relay server."
-              : "The call media path failed. Add a TURN server for cross-network calls.",
-          );
-          break;
-        default:
-          break;
+        handlePeerConnectionFailure("Media connection failed.");
       }
     };
 
@@ -427,7 +416,7 @@ export function useAudioCall({
     updateSession,
   ]);
 
-  const ensureLocalAudio = useCallback(async () => {
+  const ensureLocalMedia = useCallback(async (type: CallType) => {
     if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
       throw new Error("secure_context_required");
     }
@@ -445,10 +434,15 @@ export function useAudioCall({
         echoCancellation: true,
         noiseSuppression: true,
       },
-      video: false,
+      video: type === "video" ? {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: "user"
+      } : false,
     });
 
     localStreamRef.current = stream;
+    setLocalStream(stream);
     return stream;
   }, []);
 
@@ -462,11 +456,11 @@ export function useAudioCall({
     updateSession((session) => ({
       ...session,
       phase: "requesting_permission",
-      status: "Requesting microphone access...",
+      status: `Requesting ${session.callType === 'video' ? 'camera' : 'microphone'} access...`,
     }));
 
     try {
-      await Promise.all([ensureLocalAudio(), ensureCallRuntimeConfig()]);
+      await Promise.all([ensureLocalMedia(current.callType), ensureCallRuntimeConfig()]);
       if (!sessionRef.current || sessionRef.current.callID !== current.callID) {
         releaseMediaResources();
         return;
@@ -486,7 +480,6 @@ export function useAudioCall({
         status: `Connecting to @${session.peerUsername}...`,
       }));
 
-      // If we have a pending offer from before we accepted, handle it now
       if (pendingRemoteOfferRef.current) {
         const description = pendingRemoteOfferRef.current;
         pendingRemoteOfferRef.current = null;
@@ -521,17 +514,18 @@ export function useAudioCall({
         },
         { silentFailure: true },
       );
-      finishCall(getMediaErrorMessage(error), "error");
+      finishCall(getMediaErrorMessage(error, current.callType), "error");
     }
   }, [
     currentUsername,
     ensureCallRuntimeConfig,
-    ensureLocalAudio,
+    ensureLocalMedia,
     ensurePeerConnection,
     finishCall,
     releaseMediaResources,
     sendSignal,
     updateSession,
+    flushPendingCandidates,
   ]);
 
   const declineIncomingCall = useCallback(() => {
@@ -590,7 +584,6 @@ export function useAudioCall({
     updateSession((session) => ({
       ...session,
       isMuted: nextMuted,
-      status: nextMuted ? "Your microphone is muted." : `In call with @${session.peerUsername}`,
     }));
 
     sendSignal(
@@ -605,8 +598,36 @@ export function useAudioCall({
     );
   }, [currentUsername, sendSignal, updateSession]);
 
+  const toggleVideo = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current || !localStreamRef.current || current.callType !== 'video') {
+      return;
+    }
+
+    const nextVideoOff = !current.isVideoOff;
+    localStreamRef.current.getVideoTracks().forEach((track) => {
+      track.enabled = !nextVideoOff;
+    });
+
+    updateSession((session) => ({
+      ...session,
+      isVideoOff: nextVideoOff,
+    }));
+
+    sendSignal(
+      {
+        type: "call_video_state",
+        receiver_id: current.peerID,
+        call_id: current.callID,
+        video_off: nextVideoOff,
+        username: currentUsername,
+      },
+      { silentFailure: true },
+    );
+  }, [currentUsername, sendSignal, updateSession]);
+
   const startCall = useCallback(
-    async (peerID: string, peerUsername?: string) => {
+    async (peerID: string, peerUsername: string | undefined, type: CallType) => {
       if (!peerID) {
         return;
       }
@@ -622,29 +643,35 @@ export function useAudioCall({
 
       if (!socketConnected) {
         setCallNotice({
-          message: "The realtime connection is offline. Reconnect before placing a call.",
+          message: "The realtime connection is offline.",
           tone: "error",
         });
         return;
       }
 
-      const nextCallID = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${peerID}`;
+      const nextCallID = typeof crypto !== "undefined" && "randomUUID" in crypto 
+        ? crypto.randomUUID() 
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+        
       const label = peerUsername || "ghost";
 
       setCallNotice(null);
       commitSession({
         callID: nextCallID,
+        callType: type,
         direction: "outgoing",
         isMuted: false,
+        isVideoOff: false,
         peerID,
         peerUsername: label,
         phase: "requesting_permission",
         remoteMuted: false,
-        status: "Requesting microphone access...",
+        remoteVideoOff: false,
+        status: `Requesting ${type === 'video' ? 'camera' : 'microphone'} access...`,
       });
 
       try {
-        await Promise.all([ensureLocalAudio(), ensureCallRuntimeConfig()]);
+        await Promise.all([ensureLocalMedia(type), ensureCallRuntimeConfig()]);
         if (!sessionRef.current || sessionRef.current.callID !== nextCallID) {
           releaseMediaResources();
           return;
@@ -654,6 +681,7 @@ export function useAudioCall({
           type: "call_invite",
           receiver_id: peerID,
           call_id: nextCallID,
+          call_type: type,
           username: currentUsername,
         });
 
@@ -688,7 +716,7 @@ export function useAudioCall({
           finishCall(`@${label} did not answer.`, "info");
         }, UNANSWERED_TIMEOUT_MS);
       } catch (error) {
-        finishCall(getMediaErrorMessage(error), "error");
+        finishCall(getMediaErrorMessage(error, type), "error");
       }
     },
     [
@@ -696,7 +724,7 @@ export function useAudioCall({
       commitSession,
       currentUsername,
       ensureCallRuntimeConfig,
-      ensureLocalAudio,
+      ensureLocalMedia,
       finishCall,
       releaseMediaResources,
       sendSignal,
@@ -706,22 +734,18 @@ export function useAudioCall({
   );
 
   useEffect(() => {
-    if (!remoteAudioRef.current) {
+    if (!remoteVideoRef.current || !remoteStream) {
       return;
     }
-
-    remoteAudioRef.current.srcObject = remoteStream;
-    if (remoteStream) {
-      void remoteAudioRef.current.play().catch(() => {
-        setCallNotice((current) =>
-          current || {
-            message: "Remote audio is ready. If you do not hear it, tap the page once and try again.",
-            tone: "info",
-          },
-        );
-      });
-    }
+    remoteVideoRef.current.srcObject = remoteStream;
   }, [remoteStream]);
+
+  useEffect(() => {
+    if (!localVideoRef.current || !localStream) {
+      return;
+    }
+    localVideoRef.current.srcObject = localStream;
+  }, [localStream]);
 
   useEffect(() => {
     if (!lastEvent || !CALL_SIGNAL_TYPES.has(lastEvent.type)) {
@@ -737,12 +761,10 @@ export function useAudioCall({
     const incomingUsername = payload.username?.trim() || "ghost";
     const active = sessionRef.current;
 
-    // Fix Bug 2: Prevent processing the same event multiple times (Zombie Loop)
     const eventFingerprint = `${lastEvent.type}:${payload.call_id}`;
     if (processedCallEventsRef.current.has(eventFingerprint)) {
       return;
     }
-    // Only mark invite/accept/end signals as processed to avoid blocking frequent ones like ICE
     if (["call_invite", "call_accept", "call_decline", "call_cancel", "call_end"].includes(lastEvent.type)) {
       processedCallEventsRef.current.add(eventFingerprint);
     }
@@ -785,13 +807,16 @@ export function useAudioCall({
       setCallNotice(null);
       commitSession({
         callID: payload.call_id,
+        callType: payload.call_type || "audio",
         direction: "incoming",
         isMuted: false,
+        isVideoOff: false,
         peerID: incomingUserID,
         peerUsername: incomingUsername,
         phase: "incoming",
         remoteMuted: false,
-        status: `Incoming voice call from @${incomingUsername}`,
+        remoteVideoOff: false,
+        status: `Incoming ${payload.call_type || 'audio'} call from @${incomingUsername}`,
       });
       return;
     }
@@ -806,10 +831,10 @@ export function useAudioCall({
         updateSession((session) => ({
           ...session,
           phase: "connecting",
-          status: `@${session.peerUsername} joined. Connecting audio...`,
+          status: `@${session.peerUsername} joined. Connecting...`,
         }));
         void ensurePeerConnection().catch(() => {
-          handlePeerConnectionFailure("Unable to start the audio call.");
+          handlePeerConnectionFailure("Unable to start the call.");
         });
         break;
       case "call_decline":
@@ -829,92 +854,64 @@ export function useAudioCall({
         finishCall(`Call with @${active.peerUsername} ended.`);
         break;
       case "call_offer":
-      case "sdp_offer":
-        if (!payload.description && !(payload as any).sdp) {
+        if (!payload.description) {
           return;
         }
-        {
-          const description = payload.description || { type: "offer", sdp: (payload as any).sdp };
-          // Fix Bug 1: If we haven't accepted the call yet, buffer the offer
-          if (!active || active.phase === "incoming") {
-            pendingRemoteOfferRef.current = description;
-            return;
-          }
+        if (!active || active.phase === "incoming") {
+          pendingRemoteOfferRef.current = payload.description;
+          return;
+        }
+        void (async () => {
+          try {
+            const connection = await ensurePeerConnection();
+            const polite = shouldYieldToIncomingInvite(currentUserID, incomingUserID);
+            const offerCollision = makingOfferRef.current || connection.signalingState !== "stable";
+            
+            ignoreOfferRef.current = !polite && offerCollision;
+            if (ignoreOfferRef.current) return;
 
-          void (async () => {
-            try {
-              const connection = await ensurePeerConnection();
-              const readyForOffer =
-                !makingOfferRef.current &&
-                (connection.signalingState === "stable" || isSettingRemoteAnswerPendingRef.current);
-              const offerCollision = !readyForOffer;
-              const polite = shouldYieldToIncomingInvite(currentUserID, incomingUserID);
-              ignoreOfferRef.current = !polite && offerCollision;
-              if (ignoreOfferRef.current) {
-                return;
-              }
+            if (offerCollision) {
+              await Promise.all([
+                connection.setLocalDescription({ type: "rollback" }),
+                connection.setRemoteDescription(toRTCSessionDescription(payload.description!)),
+              ]);
+            } else {
+              await connection.setRemoteDescription(toRTCSessionDescription(payload.description!));
+            }
 
-              if (offerCollision) {
-                await Promise.all([
-                  connection.setLocalDescription({ type: "rollback" }),
-                  connection.setRemoteDescription(toRTCSessionDescription(description)),
-                ]);
-              } else {
-                await connection.setRemoteDescription(toRTCSessionDescription(description));
-              }
-
-              await flushPendingCandidates();
-              await connection.setLocalDescription();
-              const answer = connection.localDescription;
-              if (!answer) {
-                throw new Error("missing_local_answer");
-              }
+            await flushPendingCandidates();
+            await connection.setLocalDescription();
+            const answer = connection.localDescription;
+            if (answer) {
               sendSignal({
                 type: "call_answer",
                 receiver_id: active.peerID,
                 call_id: active.callID,
-                description: {
-                  type: answer.type,
-                  sdp: answer.sdp || "",
-                },
+                description: { type: answer.type, sdp: answer.sdp || "" },
                 username: currentUsername,
               });
-              updateSession((session) => ({
-                ...session,
-                phase: "connecting",
-                status: `Joining @${session.peerUsername}...`,
-              }));
-            } catch {
-              handlePeerConnectionFailure("Unable to answer the call.");
             }
-          })();
-        }
+          } catch {
+            handlePeerConnectionFailure("Unable to answer the call.");
+          }
+        })();
         break;
       case "call_answer":
-      case "sdp_answer":
-        if (!payload.description && !(payload as any).sdp) {
+        if (!payload.description) {
           return;
         }
-        {
-          const description = payload.description || { type: "answer", sdp: (payload as any).sdp };
         void (async () => {
           try {
             const connection = await ensurePeerConnection();
             isSettingRemoteAnswerPendingRef.current = true;
-            await connection.setRemoteDescription(toRTCSessionDescription(description));
+            await connection.setRemoteDescription(toRTCSessionDescription(payload.description!));
             isSettingRemoteAnswerPendingRef.current = false;
             await flushPendingCandidates();
-            updateSession((session) => ({
-              ...session,
-              phase: "connecting",
-              status: `Connecting to @${session.peerUsername}...`,
-            }));
           } catch {
             isSettingRemoteAnswerPendingRef.current = false;
             handlePeerConnectionFailure("Unable to connect the call.");
           }
         })();
-        }
         break;
       case "call_ice_candidate":
         if (!payload.candidate) {
@@ -922,25 +919,14 @@ export function useAudioCall({
         }
         void (async () => {
           const connection = peerConnectionRef.current;
-          if (ignoreOfferRef.current) {
-            return;
-          }
-
-          if (!connection) {
+          if (ignoreOfferRef.current) return;
+          if (!connection || !connection.remoteDescription) {
             pendingCandidatesRef.current.push(payload.candidate as RTCIceCandidateInit);
             return;
           }
-
-          if (!connection.remoteDescription) {
-            pendingCandidatesRef.current.push(payload.candidate as RTCIceCandidateInit);
-            return;
-          }
-
           try {
             await connection.addIceCandidate(payload.candidate as RTCIceCandidateInit);
-          } catch {
-            // Ignore stale candidates after renegotiation or rapid hangups.
-          }
+          } catch {}
         })();
         break;
       case "call_mute_state":
@@ -949,7 +935,11 @@ export function useAudioCall({
           remoteMuted: Boolean(payload.muted),
         }));
         break;
-      default:
+      case "call_video_state":
+        updateSession((session) => ({
+          ...session,
+          remoteVideoOff: Boolean(payload.video_off),
+        }));
         break;
     }
   }, [
@@ -968,64 +958,6 @@ export function useAudioCall({
     updateSession,
   ]);
 
-  useEffect(() => {
-    const handlePageHide = () => {
-      const current = sessionRef.current;
-      if (!current) {
-        return;
-      }
-
-      sendSignal(
-        {
-          type: "call_end",
-          receiver_id: current.peerID,
-          call_id: current.callID,
-          reason: "page_hidden",
-          username: currentUsername,
-        },
-        { silentFailure: true },
-      );
-      releaseMediaResources();
-    };
-
-    window.addEventListener("pagehide", handlePageHide);
-    return () => {
-      window.removeEventListener("pagehide", handlePageHide);
-    };
-  }, [currentUsername, releaseMediaResources, sendSignal]);
-
-  useEffect(() => {
-    return () => {
-      const current = sessionRef.current;
-      if (!current) {
-        return;
-      }
-
-      sendSignal(
-        {
-          type: "call_end",
-          receiver_id: current.peerID,
-          call_id: current.callID,
-          reason: "chat_closed",
-          username: currentUsername,
-        },
-        { silentFailure: true },
-      );
-      releaseMediaResources();
-    };
-  }, [currentUsername, releaseMediaResources, sendSignal]);
-
-  useEffect(() => {
-    if (socketConnected || !sessionRef.current) {
-      return;
-    }
-
-    setCallNotice({
-      message: "The realtime connection dropped. Call controls may be unavailable until the socket reconnects.",
-      tone: "error",
-    });
-  }, [socketConnected]);
-
   return {
     acceptIncomingCall,
     callNotice,
@@ -1033,9 +965,13 @@ export function useAudioCall({
     declineIncomingCall,
     dismissCallNotice: () => setCallNotice(null),
     endCall,
-    remoteAudioRef,
+    remoteVideoRef,
+    localVideoRef,
     startCall,
     toggleMute,
+    toggleVideo,
+    localStream,
+    remoteStream,
   };
 }
 
@@ -1043,48 +979,25 @@ function shouldYieldToIncomingInvite(currentUserID: string, incomingUserID: stri
   return currentUserID.localeCompare(incomingUserID) < 0;
 }
 
-function getMediaErrorMessage(error: unknown) {
+function getMediaErrorMessage(error: unknown, type: CallType) {
+  const device = type === 'video' ? 'camera' : 'microphone';
   if (error instanceof DOMException) {
     switch (error.name) {
       case "NotAllowedError":
-      case "PermissionDeniedError":
-        return "Microphone permission is required to place or answer a call.";
+        return `Permission to access the ${device} was denied.`;
       case "NotFoundError":
-      case "DevicesNotFoundError":
-        return "No microphone was found on this device.";
+        return `No ${device} was found on this device.`;
       case "NotReadableError":
-      case "TrackStartError":
-        return "The microphone is busy in another app. Close the other app and try again.";
-      case "OverconstrainedError":
-      case "ConstraintNotSatisfiedError":
-        return "The browser could not start the microphone with the required settings.";
-      case "AbortError":
-        return "The browser interrupted microphone access. Try again.";
-      default:
-        return "Microphone access is required for calls.";
+        return `The ${device} is already in use by another application.`;
     }
   }
-
-  if (error instanceof Error) {
-    switch (error.message) {
-      case "calling_not_supported":
-        return "This browser does not support audio calling.";
-      case "secure_context_required":
-        return "Microphone access needs HTTPS or localhost.";
-      case "media_devices_unavailable":
-        return "This browser cannot access microphone devices.";
-      default:
-        return error.message || "Unable to start the microphone.";
-    }
-  }
-
-  return "Unable to start the microphone.";
+  return `Unable to access the ${device}.`;
 }
 
-function toRTCSessionDescription(description: CallSignalPayload["description"]): RTCSessionDescriptionInit {
+function toRTCSessionDescription(description: SessionDescriptionPayload): RTCSessionDescriptionInit {
   return {
-    sdp: description?.sdp || "",
-    type: (description?.type || "offer") as RTCSdpType,
+    sdp: description.sdp,
+    type: description.type as RTCSdpType,
   };
 }
 
@@ -1101,10 +1014,6 @@ function normalizeRTCConfiguration(config: CallRuntimeConfig): RTCConfiguration 
   return {
     iceCandidatePoolSize: 2,
     iceServers,
-    iceTransportPolicy: toIceTransportPolicy(config.transport_policy),
+    iceTransportPolicy: config.transport_policy === "relay" ? "relay" : "all",
   };
-}
-
-function toIceTransportPolicy(value?: string): RTCIceTransportPolicy {
-  return value === "relay" ? "relay" : "all";
 }

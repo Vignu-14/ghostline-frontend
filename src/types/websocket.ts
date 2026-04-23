@@ -14,7 +14,8 @@ export type WebSocketEventType =
   | "call_answer"
   | "call_ice_candidate"
   | "call_end"
-  | "call_mute_state";
+  | "call_mute_state"
+  | "call_video_state";
 
 export interface WebSocketEvent {
   type: WebSocketEventType | string;
@@ -27,9 +28,11 @@ export interface OutgoingWebSocketMessage {
   receiver_id: string;
   content?: string;
   call_id?: string;
+  call_type?: string;
   description?: SessionDescriptionPayload;
   candidate?: ICECandidatePayload;
   reason?: string;
   username?: string;
   muted?: boolean;
+  video_off?: boolean;
 }

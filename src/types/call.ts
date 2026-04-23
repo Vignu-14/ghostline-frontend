@@ -8,7 +8,10 @@ export type CallEventType =
   | "call_answer"
   | "call_ice_candidate"
   | "call_end"
-  | "call_mute_state";
+  | "call_mute_state"
+  | "call_video_state";
+
+export type CallType = "audio" | "video";
 
 export type CallPhase =
   | "idle"
@@ -37,21 +40,26 @@ export interface CallSignalPayload {
   call_id: string;
   user_id: string;
   username?: string;
+  call_type?: CallType;
   description?: SessionDescriptionPayload;
   candidate?: ICECandidatePayload;
   reason?: string;
   muted?: boolean;
+  video_off?: boolean;
 }
 
 export interface CallSession {
   callID: string;
+  callType: CallType;
   direction: CallDirection;
   error?: string;
   isMuted: boolean;
+  isVideoOff?: boolean;
   peerID: string;
   peerUsername: string;
   phase: CallPhase;
   remoteMuted: boolean;
+  remoteVideoOff?: boolean;
   status: string;
 }
 

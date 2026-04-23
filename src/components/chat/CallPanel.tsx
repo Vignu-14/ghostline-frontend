@@ -10,7 +10,9 @@ type CallPanelProps = {
   onDismissNotice: () => void;
   onEnd: () => void;
   onToggleMute: () => void;
-  remoteAudioRef: RefObject<HTMLAudioElement | null>;
+  onToggleVideo: () => void;
+  remoteVideoRef: RefObject<HTMLVideoElement | null>;
+  localVideoRef: RefObject<HTMLVideoElement | null>;
 };
 
 export function CallPanel({
@@ -21,26 +23,59 @@ export function CallPanel({
   onDismissNotice,
   onEnd,
   onToggleMute,
-  remoteAudioRef,
+  onToggleVideo,
+  remoteVideoRef,
+  localVideoRef,
 }: CallPanelProps) {
   if (!callSession && !callNotice) {
     return null;
   }
 
+  const isVideo = callSession?.callType === "video";
+
   return (
     <>
       {callSession ? (
-        <section className={`call-panel call-panel--${callSession.phase}`}>
-          <div className="call-panel__copy">
-            <p className="eyebrow">🎙️ Voice call</p>
-            <h3>@{callSession.peerUsername}</h3>
-            <p className="support-copy">{callSession.status}</p>
-            <div className="call-panel__meta">
-              <span>{callSession.direction === "incoming" ? "📞 Incoming" : "📤 Outgoing"}</span>
-              <span>{callSession.isMuted ? "🔇 Muted" : "🎤 Live"}</span>
-              {callSession.remoteMuted ? <span>🔇 @{callSession.peerUsername} muted</span> : null}
+        <section className={`call-panel call-panel--${callSession.phase} ${isVideo ? 'call-panel--video' : 'call-panel--audio'}`}>
+          {isVideo && callSession.phase === "active" ? (
+            <div className="video-grid">
+              <video
+                autoPlay
+                playsInline
+                ref={remoteVideoRef}
+                className={`remote-video ${callSession.remoteVideoOff ? 'hidden' : ''}`}
+              />
+              <video
+                autoPlay
+                playsInline
+                muted
+                ref={localVideoRef}
+                className={`local-video ${callSession.isVideoOff ? 'hidden' : ''}`}
+              />
+              {callSession.remoteVideoOff && (
+                <div className="remote-video-placeholder">
+                   <div className="avatar-circle large">
+                    {callSession.peerUsername.slice(0, 1).toUpperCase()}
+                   </div>
+                   <p>Video paused</p>
+                </div>
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="call-panel__copy">
+              <p className="eyebrow">{isVideo ? '📹 Video' : '🎙️ Audio'} call</p>
+              <div className="avatar-circle">
+                {callSession.peerUsername.slice(0, 1).toUpperCase()}
+              </div>
+              <h3>@{callSession.peerUsername}</h3>
+              <p className="support-copy">{callSession.status}</p>
+              <div className="call-panel__meta">
+                <span>{callSession.direction === "incoming" ? "📞 Incoming" : "📤 Outgoing"}</span>
+                <span>{callSession.isMuted ? "🔇 Muted" : "🎤 Live"}</span>
+                {callSession.remoteMuted ? <span>🔇 @{callSession.peerUsername} muted</span> : null}
+              </div>
+            </div>
+          )}
 
           <div className="call-panel__actions">
             {callSession.phase === "incoming" ? (
@@ -48,7 +83,7 @@ export function CallPanel({
                 <Button onClick={onDecline} type="button" variant="ghost" size="sm">
                   Decline
                 </Button>
-                <Button onClick={onAccept} type="button" size="sm">
+                <Button onClick={onAccept} type="button" size="sm" variant="primary">
                   Accept
                 </Button>
               </>
@@ -63,6 +98,17 @@ export function CallPanel({
                 >
                   {callSession.isMuted ? "Unmute" : "Mute"}
                 </Button>
+                {isVideo && (
+                  <Button
+                    disabled={callSession.phase === "requesting_permission"}
+                    onClick={onToggleVideo}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                  >
+                    {callSession.isVideoOff ? "Turn Video On" : "Turn Video Off"}
+                  </Button>
+                )}
                 <Button onClick={onEnd} type="button" variant="danger" size="sm">
                   {callSession.phase === "outgoing" ? "Cancel" : "End call"}
                 </Button>
@@ -70,7 +116,7 @@ export function CallPanel({
             )}
           </div>
 
-          <audio autoPlay playsInline ref={remoteAudioRef} />
+          {!isVideo && <audio autoPlay playsInline ref={remoteVideoRef as any} />}
         </section>
       ) : null}
 

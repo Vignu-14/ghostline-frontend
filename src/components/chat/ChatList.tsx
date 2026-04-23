@@ -63,7 +63,11 @@ export function ChatList({
                 type="button"
               >
                 <div className="user-avatar">
-                  {user.username.slice(0, 1).toUpperCase()}
+                  {user.profile_picture_url ? (
+                    <img src={user.profile_picture_url} alt={user.username} className="user-avatar__img" />
+                  ) : (
+                    user.username.slice(0, 1).toUpperCase()
+                  )}
                 </div>
                 <div className="user-list-item__info">
                   <span className="font-medium text-sm">@{user.username}</span>
@@ -95,7 +99,11 @@ export function ChatList({
             type="button"
           >
             <div className="user-avatar">
-              {conversation.username.slice(0, 1).toUpperCase()}
+              {conversation.profile_picture_url ? (
+                <img src={conversation.profile_picture_url} alt={conversation.username} className="user-avatar__img" />
+              ) : (
+                conversation.username.slice(0, 1).toUpperCase()
+              )}
             </div>
             <div className="user-list-item__info">
               <div className="user-list-item__top">
