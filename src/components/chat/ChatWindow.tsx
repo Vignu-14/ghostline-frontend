@@ -82,16 +82,40 @@ export function ChatWindow({
   const [isWorking, setIsWorking] = useState(false);
   const [localError, setLocalError] = useState("");
   const [selectedMessageIDs, setSelectedMessageIDs] = useState<string[]>([]);
+  const lastScrollCountRef = useRef(0);
+  const lastConversationRef = useRef<string | undefined>(undefined);
+
   const connectionTone = !isOnline ? "offline" : socketConnected ? "live" : "warming";
   const connectionLabel = !isOnline ? "You are offline" : socketConnected ? "Connected" : "Reconnecting...";
 
   useEffect(() => {
-    if (!messageListRef.current) {
-      return;
+    const el = messageListRef.current;
+    if (!el) return;
+
+    const isNewConversation = lastConversationRef.current !== conversationUserID;
+    const hasNewMessages = messages.length > lastScrollCountRef.current;
+
+    // Determine if we should scroll
+    let shouldScroll = false;
+
+    if (isNewConversation) {
+      // Always scroll to bottom when switching chats
+      shouldScroll = true;
+    } else if (hasNewMessages) {
+      // Only scroll if user is already near the bottom
+      const threshold = 150; // pixels from bottom
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+      shouldScroll = isNearBottom;
     }
 
-    messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
-  }, [messages, disabled, title]);
+    if (shouldScroll) {
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // Update refs for next render
+    lastScrollCountRef.current = messages.length;
+    lastConversationRef.current = conversationUserID;
+  }, [messages, disabled, conversationUserID]);
 
   useEffect(() => {
     setSelectedMessageIDs((current) =>
