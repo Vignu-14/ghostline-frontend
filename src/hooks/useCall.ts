@@ -147,20 +147,38 @@ export function useCall({
     iceRestartedRef.current = false;
     pendingRemoteOfferRef.current = null;
 
+    // Fix 1: Robust PeerConnection cleanup
     if (peerConnectionRef.current) {
       peerConnectionRef.current.onconnectionstatechange = null;
       peerConnectionRef.current.oniceconnectionstatechange = null;
       peerConnectionRef.current.onicecandidate = null;
       peerConnectionRef.current.onnegotiationneeded = null;
       peerConnectionRef.current.ontrack = null;
+      
+      // Stop all remote tracks received
+      peerConnectionRef.current.getReceivers().forEach(receiver => {
+        if (receiver.track) receiver.track.stop();
+      });
+      
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
 
-    localStreamRef.current?.getTracks().forEach((track) => track.stop());
-    localStreamRef.current = null;
+    // Fix 1: Robust Local Media cleanup
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+        track.enabled = false;
+      });
+      localStreamRef.current = null;
+    }
+
     setLocalStream(null);
     setRemoteStream(null);
+    
+    // Explicitly clear video elements
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
   }, [clearDisconnectTimer, clearUnansweredTimer]);
 
   const finishCall = useCallback(
@@ -425,10 +443,14 @@ export function useCall({
       throw new Error("media_devices_unavailable");
     }
 
-    localStreamRef.current?.getTracks().forEach((track) => track.stop());
-    localStreamRef.current = null;
+    // Fix 1: Ensure previous tracks are stopped before acquiring new ones
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
+    // Fix 2: Strict getUserMedia Constraints
+    const constraints: MediaStreamConstraints = {
       audio: {
         autoGainControl: true,
         echoCancellation: true,
@@ -439,7 +461,9 @@ export function useCall({
         height: { ideal: 720 },
         facingMode: "user"
       } : false,
-    });
+    };
+
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
     localStreamRef.current = stream;
     setLocalStream(stream);
@@ -957,6 +981,12 @@ export function useCall({
     sendSignal,
     updateSession,
   ]);
+
+  useEffect(() => {
+    return () => {
+      releaseMediaResources();
+    };
+  }, [releaseMediaResources]);
 
   return {
     acceptIncomingCall,
