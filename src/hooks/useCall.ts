@@ -762,14 +762,14 @@ export function useCall({
       return;
     }
     remoteVideoRef.current.srcObject = remoteStream;
-  }, [remoteStream]);
+  }, [remoteStream, callSession?.phase]);
 
   useEffect(() => {
     if (!localVideoRef.current || !localStream) {
       return;
     }
     localVideoRef.current.srcObject = localStream;
-  }, [localStream]);
+  }, [localStream, callSession?.phase]);
 
   useEffect(() => {
     if (!lastEvent || !CALL_SIGNAL_TYPES.has(lastEvent.type)) {

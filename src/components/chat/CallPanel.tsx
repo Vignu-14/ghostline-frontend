@@ -37,31 +37,31 @@ export function CallPanel({
     <>
       {callSession ? (
         <section className={`call-panel call-panel--${callSession.phase} ${isVideo ? 'call-panel--video' : 'call-panel--audio'}`}>
-          {isVideo && callSession.phase === "active" ? (
-            <div className="video-grid">
-              <video
-                autoPlay
-                playsInline
-                ref={remoteVideoRef}
-                className={`remote-video ${callSession.remoteVideoOff ? 'hidden' : ''}`}
-              />
-              <video
-                autoPlay
-                playsInline
-                muted
-                ref={localVideoRef}
-                className={`local-video ${callSession.isVideoOff ? 'hidden' : ''}`}
-              />
-              {callSession.remoteVideoOff && (
-                <div className="remote-video-placeholder">
-                   <div className="avatar-circle large">
-                    {callSession.peerUsername.slice(0, 1).toUpperCase()}
-                   </div>
-                   <p>Video paused</p>
-                </div>
-              )}
-            </div>
-          ) : (
+          <div className={`video-grid ${(isVideo && callSession.phase === "active") ? '' : 'hidden-video'}`}>
+            <video
+              autoPlay
+              playsInline
+              ref={remoteVideoRef}
+              className={`remote-video ${callSession.remoteVideoOff ? 'hidden' : ''}`}
+            />
+            <video
+              autoPlay
+              playsInline
+              muted
+              ref={localVideoRef}
+              className={`local-video ${callSession.isVideoOff ? 'hidden' : ''}`}
+            />
+            {isVideo && callSession.remoteVideoOff && (
+              <div className="remote-video-placeholder">
+                 <div className="avatar-circle large">
+                  {callSession.peerUsername.slice(0, 1).toUpperCase()}
+                 </div>
+                 <p>Video paused</p>
+              </div>
+            )}
+          </div>
+
+          {(callSession.phase !== "active" || !isVideo) && (
             <div className="call-panel__copy">
               <p className="eyebrow">{isVideo ? '📹 Video' : '🎙️ Audio'} call</p>
               <div className="avatar-circle">
