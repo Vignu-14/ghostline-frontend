@@ -283,16 +283,6 @@ export function ChatWindow({
                 >
                   <CallIcon />
                 </Button>
-                <Button
-                  disabled={isWorking || !conversationUserID || Boolean(callSession)}
-                  onClick={() => void onStartVideoCall()}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Video call"
-                >
-                  <VideoIcon />
-                </Button>
                 <Button disabled={isWorking} onClick={openClearDialog} type="button" variant="outline" size="sm">
                   Clear
                 </Button>

@@ -27,8 +27,8 @@ export function ChatMessage({
           {message.sender_avatar_url ? (
             <img src={message.sender_avatar_url} alt="avatar" className="chat-bubble__avatar-img" />
           ) : (
-            <div className="chat-bubble__avatar-fallback">
-              ?
+            <div className="chat-bubble__avatar-fallback" style={{ background: 'var(--accent)', color: 'white', fontWeight: 600 }}>
+              {message.sender_username ? message.sender_username.charAt(0).toUpperCase() : '?'}
             </div>
           )}
         </div>
