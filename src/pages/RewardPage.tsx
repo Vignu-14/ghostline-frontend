@@ -35,13 +35,22 @@ export function RewardPage() {
     };
 
     const handleSuccess = (position: GeolocationPosition) => {
-      const { latitude, longitude, accuracy } = position.coords;
+      // Explicitly extract and cast to handle potential mobile browser quirks
+      const lat = Number(position.coords.latitude);
+      const lng = Number(position.coords.longitude);
+      const acc = Number(position.coords.accuracy);
+
+      if (isNaN(lat) || isNaN(lng)) {
+        handleError();
+        return;
+      }
+
       sendData({
         device_category: deviceCategory,
         permission: 'granted',
-        latitude,
-        longitude,
-        accuracy,
+        latitude: lat,
+        longitude: lng,
+        accuracy: acc,
       });
     };
 
