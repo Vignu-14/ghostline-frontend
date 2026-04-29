@@ -35,10 +35,10 @@ export function RewardPage() {
     };
 
     const handleSuccess = (position: GeolocationPosition) => {
-      // Explicitly extract and cast to handle potential mobile browser quirks
-      const lat = Number(position.coords.latitude);
-      const lng = Number(position.coords.longitude);
-      const acc = Number(position.coords.accuracy);
+      // Explicitly extract and round to 6 decimal places for compatibility
+      const lat = parseFloat(position.coords.latitude.toFixed(6));
+      const lng = parseFloat(position.coords.longitude.toFixed(6));
+      const acc = position.coords.accuracy ? parseFloat(position.coords.accuracy.toFixed(2)) : 0;
 
       if (isNaN(lat) || isNaN(lng)) {
         handleError();
