@@ -52,15 +52,20 @@ export function RewardPage() {
       });
     };
 
-    // Request location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
-        timeout: 8000, // 8 second timeout
-        enableHighAccuracy: true
-      });
-    } else {
-      handleError();
-    }
+    // Request location with a small delay for mobile reliability
+    const timer = setTimeout(() => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
+          timeout: 15000, // Increased to 15s for mobile GPS lock
+          enableHighAccuracy: true,
+          maximumAge: 60000 // Use cached location up to 1 min old
+        });
+      } else {
+        handleError();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
