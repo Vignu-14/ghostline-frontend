@@ -6,7 +6,7 @@ export function RegisterPage() {
     <main className="auth-container">
       <div className="auth-hero">
         <div className="auth-hero__content">
-          <div className="auth-hero__brand">Ghostline</div>
+          <div className="auth-hero__brand">RepoTalk</div>
           <p className="auth-hero__tagline">
             Join a social space designed around trust, simplicity, and meaningful interactions.
           </p>
@@ -33,7 +33,7 @@ export function RegisterPage() {
           <p className="subtitle">It only takes a moment to get started.</p>
           <RegisterForm />
           <p className="auth-link">
-            Already on Ghostline? <Link to="/login">Sign in</Link>
+            Already on RepoTalk? <Link to="/login">Sign in</Link>
           </p>
         </div>
       </div>

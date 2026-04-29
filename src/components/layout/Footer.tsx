@@ -32,7 +32,7 @@ export function Footer() {
   return (
     <footer className="site-footer">
       <div className="site-footer__copy">
-        <p className="eyebrow">Ghostline</p>
+        <p className="eyebrow">RepoTalk</p>
         <p>Real connections through a cleaner social experience. No algorithms, just genuine conversations.</p>
       </div>
 

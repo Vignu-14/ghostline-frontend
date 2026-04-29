@@ -329,16 +329,23 @@ export function ChatWindow({
         ) : null}
 
         {!disabled
-          ? messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              isOwn={message.sender_id === currentUserID}
-              isSelected={selectedMessageIDs.includes(message.id)}
-              isSelectionMode={isSelectionMode}
-              message={message}
-              onToggleSelect={toggleSelection}
-            />
-          ))
+          ? messages.map((message, index) => {
+            const prevMessage = messages[index - 1];
+            const isSameSender = prevMessage && prevMessage.sender_id === message.sender_id;
+            
+            return (
+              <ChatMessage
+                key={message.id}
+                isOwn={message.sender_id === currentUserID}
+                isSelected={selectedMessageIDs.includes(message.id)}
+                isSelectionMode={isSelectionMode}
+                message={message}
+                onToggleSelect={toggleSelection}
+                showAvatar={!isSameSender}
+                isClustered={isSameSender}
+              />
+            );
+          })
           : null}
       </div>
 

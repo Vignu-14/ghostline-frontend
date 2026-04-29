@@ -10,7 +10,7 @@ export function HomePage() {
     return (
       <div className="reveal-up">
         <section className="hero">
-          <h1>Welcome to Ghostline</h1>
+          <h1>Welcome to RepoTalk</h1>
           <p>
             A private social space built on trust, speed, and real connections.
             No algorithms — just you and your network.

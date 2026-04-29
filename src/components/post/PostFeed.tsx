@@ -45,7 +45,7 @@ export function PostFeed() {
   }
 
   async function handleDelete(post: Post) {
-    const confirmed = window.confirm("Delete this post from Ghostline?");
+    const confirmed = window.confirm("Delete this post from RepoTalk?");
     if (!confirmed) {
       return;
     }

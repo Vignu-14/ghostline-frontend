@@ -96,7 +96,7 @@ export function CreatePost({ onCreated }: CreatePostProps) {
       {status ? <p className="support-copy">{status}</p> : null}
 
       <Button disabled={isSubmitting} type="submit">
-        {isSubmitting ? "Publishing..." : "Publish to Ghostline"}
+        {isSubmitting ? "Publishing..." : "Publish to RepoTalk"}
       </Button>
     </form>
   );

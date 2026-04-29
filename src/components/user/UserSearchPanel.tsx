@@ -44,7 +44,7 @@ export function UserSearchPanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <p className="text-sm text-muted" style={{ marginBottom: '14px' }}>
-        Find people on Ghostline and check out their profiles.
+        Find people on RepoTalk and check out their profiles.
       </p>
 
       <div className="form-group" style={{ marginBottom: '12px' }}>

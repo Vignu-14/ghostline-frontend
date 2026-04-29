@@ -40,14 +40,31 @@ export function MessageInput({ disabled, onSend }: MessageInputProps) {
   }
 
   return (
-    <div className="chat-input-dock">
-      <form className="chat-input-form" onSubmit={handleSubmit}>
+    <div className="chat-input-dock" style={{ background: 'transparent', borderTop: 'none' }}>
+      <form 
+        className="chat-input-form" 
+        onSubmit={handleSubmit}
+        style={{
+          border: '1px solid var(--line)',
+          borderRadius: 'var(--radius-full)',
+          padding: '8px 16px',
+          margin: '16px',
+          background: 'var(--surface-strong)',
+          boxShadow: 'var(--shadow-sm)'
+        }}
+      >
         <input
           className="chat-input-field"
           ref={inputRef}
           disabled={disabled || isSending}
           onChange={(event) => setContent(event.target.value)}
           placeholder={disabled ? "Select a conversation..." : "Type your message..."}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            boxShadow: 'none',
+            padding: '4px 8px'
+          }}
           value={content}
         />
         <button 
@@ -55,6 +72,11 @@ export function MessageInput({ disabled, onSend }: MessageInputProps) {
           disabled={disabled || isSending || !content.trim()} 
           type="submit"
           aria-label="Send message"
+          style={{
+            height: '36px',
+            width: '36px',
+            minWidth: '36px'
+          }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13"></line>

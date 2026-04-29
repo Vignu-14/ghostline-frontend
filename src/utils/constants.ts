@@ -1,4 +1,4 @@
-export const APP_NAME = "Ghostline";
+export const APP_NAME = "RepoTalk";
 
 // API Base URL configuration with validation
 const rawApiUrl = import.meta.env.VITE_API_BASE_URL || "";

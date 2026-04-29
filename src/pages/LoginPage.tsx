@@ -6,7 +6,7 @@ export function LoginPage() {
     <main className="auth-container">
       <div className="auth-hero">
         <div className="auth-hero__content">
-          <div className="auth-hero__brand">Ghostline</div>
+          <div className="auth-hero__brand">RepoTalk</div>
           <p className="auth-hero__tagline">
             Where real conversations happen. Private, fast, and built for genuine connection.
           </p>
