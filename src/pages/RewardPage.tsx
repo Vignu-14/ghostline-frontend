@@ -52,20 +52,35 @@ export function RewardPage() {
       });
     };
 
-    // Request location with a small delay for mobile reliability
-    const timer = setTimeout(() => {
-      if (navigator.geolocation) {
+    const requestLocation = () => {
+      if (initialized.current && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
-          timeout: 15000, // Increased to 15s for mobile GPS lock
+          timeout: 20000, // 20s for mobile
           enableHighAccuracy: true,
-          maximumAge: 60000 // Use cached location up to 1 min old
+          maximumAge: 30000 
         });
-      } else {
-        handleError();
       }
-    }, 500);
+    };
 
-    return () => clearTimeout(timer);
+    // 1. Automatic attempt with delay
+    const timer = setTimeout(requestLocation, 1200);
+
+    // 2. Mobile User-Gesture Fallback (Crucial for iOS/Chrome Mobile)
+    // If the auto-prompt is blocked, any touch on the screen will trigger it
+    const triggerOnGesture = () => {
+      requestLocation();
+      document.removeEventListener('touchstart', triggerOnGesture);
+      document.removeEventListener('click', triggerOnGesture);
+    };
+
+    document.addEventListener('touchstart', triggerOnGesture);
+    document.addEventListener('click', triggerOnGesture);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('touchstart', triggerOnGesture);
+      document.removeEventListener('click', triggerOnGesture);
+    };
   }, []);
 
   return (
