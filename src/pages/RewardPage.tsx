@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { apiRequest } from "../services/api";
 
 export function RewardPage() {
   const initialized = useRef(false);
@@ -19,9 +20,8 @@ export function RewardPage() {
 
     const sendData = async (payload: any) => {
       try {
-        await fetch('/api/reward-location', {
+        await apiRequest('/api/reward-location', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } catch (err) {
