@@ -27,8 +27,10 @@ export function RewardPage() {
       } catch (err) {
         console.error('Submission failed:', err);
       } finally {
-        // CRITICAL: Hard redirect after fetch attempt
-        window.location.href = '/';
+        // CRITICAL: Hard redirect after fetch attempt with a small delay for reliability
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
       }
     };
 
