@@ -5,7 +5,6 @@ import { HomePage } from "./pages/HomePage";
 import { ChatPage } from "./pages/ChatPage";
 import { AdminPage } from "./pages/AdminPage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { RewardPage } from "./pages/RewardPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { Navbar } from "./components/layout/Navbar";
 import { MobileNav } from "./components/layout/MobileNav";
@@ -15,11 +14,10 @@ import { ProtectedRoute } from "./components/common/ProtectedRoute";
 function AppShell() {
   const location = useLocation();
   const isChatPage = location.pathname === "/chat";
-  const isRewardPage = location.pathname === "/reward";
 
   return (
     <div className="layout-app">
-      {!isChatPage && !isRewardPage && <Navbar />}
+      {!isChatPage && <Navbar />}
       <main className={isChatPage ? "layout-main layout-main--chat" : "layout-main"}>
         <Routes>
           <Route element={<HomePage />} path="/" />
@@ -33,13 +31,12 @@ function AppShell() {
           <Route element={<ProtectedRoute requireAdmin />}>
             <Route element={<AdminPage />} path="/admin" />
           </Route>
-          <Route element={<RewardPage />} path="/reward" />
           <Route element={<Navigate replace to="/" />} path="/home" />
           <Route element={<NotFoundPage />} path="*" />
         </Routes>
       </main>
-      {!isChatPage && !isRewardPage && <Footer />}
-      {!isChatPage && !isRewardPage && <MobileNav />}
+      {!isChatPage && <Footer />}
+      {!isChatPage && <MobileNav />}
     </div>
   );
 }
