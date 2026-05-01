@@ -20,44 +20,45 @@ export function ChatMessage({
   showAvatar = true,
   isClustered = false,
 }: ChatMessageProps) {
-
   const bubbleClass = isOwn ? "chat-bubble--own" : "chat-bubble--other";
   const wrapperClass = isOwn ? "chat-bubble-wrapper--own" : "chat-bubble-wrapper--other";
-
-  // Directional border radius
-  const borderRadius = isOwn 
-    ? { borderTopRightRadius: '4px' } 
-    : { borderTopLeftRadius: '4px' };
+  const borderRadius = isOwn ? { borderTopRightRadius: "4px" } : { borderTopLeftRadius: "4px" };
 
   return (
-    <div 
+    <div
       className={`chat-bubble-wrapper ${wrapperClass}`}
-      style={{ 
-        marginTop: isClustered ? '4px' : '16px',
-        marginBottom: '0px'
+      style={{
+        marginTop: isClustered ? "4px" : "16px",
+        marginBottom: "0px",
       }}
     >
-      <div className="chat-bubble__avatar" style={{ visibility: !isOwn && showAvatar ? 'visible' : 'hidden', width: isOwn ? 0 : '32px' }}>
+      <div
+        className="chat-bubble__avatar"
+        style={{ visibility: !isOwn && showAvatar ? "visible" : "hidden", width: isOwn ? 0 : "32px" }}
+      >
         {!isOwn && showAvatar && (
           message.sender_avatar_url ? (
             <img src={message.sender_avatar_url} alt="avatar" className="chat-bubble__avatar-img" />
           ) : (
-            <div className="chat-bubble__avatar-fallback" style={{ background: 'var(--bg-muted)', color: 'var(--ink-soft)', fontWeight: 600 }}>
-              {message.sender_username ? message.sender_username.charAt(0).toUpperCase() : '?'}
+            <div
+              className="chat-bubble__avatar-fallback"
+              style={{ background: "var(--bg-muted)", color: "var(--ink-soft)", fontWeight: 600 }}
+            >
+              {message.sender_username ? message.sender_username.charAt(0).toUpperCase() : "?"}
             </div>
           )
         )}
       </div>
-      <div className="chat-bubble-container" style={{ maxWidth: '75%' }}>
+      <div className="chat-bubble-container" style={{ maxWidth: "75%" }}>
         <div
           className={`chat-bubble ${bubbleClass}`}
           style={{
             ...borderRadius,
             opacity: message.deleted_for_everyone ? 0.5 : 1,
-            fontStyle: message.deleted_for_everyone ? 'italic' : 'normal',
-            outline: isSelected ? '2px solid var(--accent)' : 'none',
-            outlineOffset: '2px',
-            cursor: isSelectionMode ? 'pointer' : 'default',
+            fontStyle: message.deleted_for_everyone ? "italic" : "normal",
+            outline: isSelected ? "2px solid var(--accent)" : "none",
+            outlineOffset: "2px",
+            cursor: isSelectionMode ? "pointer" : "default",
           }}
           onClick={isSelectionMode ? () => onToggleSelect(message) : undefined}
         >

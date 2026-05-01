@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChatList } from "../components/chat/ChatList";
 import { ChatWindow } from "../components/chat/ChatWindow";
+import { IconSidebar } from "../components/layout/IconSidebar";
 import { useAuth } from "../hooks/useAuth";
 import { useCall } from "../hooks/useCall";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
@@ -12,8 +14,22 @@ import { getErrorMessage } from "../utils/errorHandler";
 import { formatRelativeDate } from "../utils/formatDate";
 import { playNotificationSound } from "../utils/audio";
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  return isDesktop;
+}
+
 export function ChatPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialLoadDoneRef = useRef(false);
+  const userIdParam = searchParams.get("u");
+  const usernameParam = searchParams.get("n");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -21,10 +37,11 @@ export function ChatPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar toggle
   const isOnline = useOnlineStatus();
   const socket = useWebSocket(Boolean(user));
   const activeConversationUsername = activeConversation?.username;
+  const isDesktop = useIsDesktop();
 
   function ensureConversation(selectedUser: { id: string; username?: string }) {
     const nextConversation: Conversation = {
@@ -94,26 +111,26 @@ export function ChatPage() {
       setError("");
       const response = await chatService.listConversations();
       const nextConversations = response.conversations || [];
-      setConversations(nextConversations);
+      
+      setConversations((prev) => {
+        // If we have a preferred user (like a newly started chat) that isn't on the server yet,
+        // keep it in the list so it doesn't disappear from the UI.
+        const ghost = prev.find(c => c.user_id === preferredUserID && !nextConversations.some(nc => nc.user_id === preferredUserID));
+        return ghost ? [ghost, ...nextConversations] : nextConversations;
+      });
+
       setActiveConversation((current) => {
-        if (preferredUserID) {
-          return (
-            nextConversations.find((conversation) => conversation.user_id === preferredUserID) ||
-            current ||
-            nextConversations[0] ||
-            null
-          );
-        }
+        const targetID = preferredUserID || current?.user_id;
+        if (!targetID) return nextConversations[0] || null;
 
-        if (current) {
-          return (
-            nextConversations.find((conversation) => conversation.user_id === current.user_id) ||
-            nextConversations[0] ||
-            null
-          );
-        }
+        const found = nextConversations.find((c) => c.user_id === targetID);
+        if (found) return found;
 
-        return nextConversations[0] || null;
+        // If not found on server but it was our active/preferred chat, keep it as is (ghost chat)
+        if (current && current.user_id === targetID) return current;
+        
+        // Fallback to first available or null
+        return current || nextConversations[0] || null;
       });
     } catch (loadError) {
       setError(getErrorMessage(loadError, "Unable to load conversations."));
@@ -121,8 +138,18 @@ export function ChatPage() {
   }
 
   useEffect(() => {
-    void loadConversations();
-  }, []);
+    if (initialLoadDoneRef.current) return;
+
+    void (async () => {
+      await loadConversations(userIdParam || undefined);
+
+      if (userIdParam) {
+        ensureConversation({ id: userIdParam, username: usernameParam || "ghost" });
+        setSearchParams({}, { replace: true });
+      }
+      initialLoadDoneRef.current = true;
+    })();
+  }, [userIdParam, usernameParam, setSearchParams]);
 
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
@@ -350,54 +377,89 @@ export function ChatPage() {
     setIsSidebarOpen(false);
   }
 
+  // Layout logic based on desktop/mobile state
+  const showIconSidebar = isDesktop;
+  
+  // On desktop, always show chat list. On mobile, show it if there's no chat, OR if the drawer is open.
+  const showChatList = isDesktop || !activeConversation || isSidebarOpen;
+  
+  // On desktop, always show chat window. On mobile, show it only if there is an active chat.
+  const showChatWindow = isDesktop || !!activeConversation;
+
   return (
-    <main className="layout-main layout-main--chat">
-      <div
-        className={`chat-sidebar-overlay ${isSidebarOpen ? "chat-sidebar-overlay--visible" : ""}`}
-        onClick={() => setIsSidebarOpen(false)}
-      />
+    <div className="flex h-full w-full bg-background text-on-background overflow-hidden font-body select-none">
+      
+      {/* 1. Nav Sidebar (WhatsApp-like thin icon bar on far left) */}
+      {showIconSidebar && (
+        <div style={{ width: '64px', minWidth: '64px' }} className="shrink-0 flex flex-col border-r border-outline-variant bg-surface-container-low z-10">
+          <IconSidebar />
+        </div>
+      )}
 
-      <div className="chat-layout">
+      {/* 2. Conversation List Pane */}
+      {showChatList && (
+        <div 
+          style={{ width: isDesktop ? '380px' : (!activeConversation ? '100%' : '320px') }}
+          className={`
+            shrink-0 flex flex-col bg-surface border-r border-outline-variant h-full
+            ${!isDesktop ? 'fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out' : 'relative z-10'}
+            ${!isDesktop && activeConversation && !isSidebarOpen ? '-translate-x-full' : 'translate-x-0'}
+          `}
+        >
+          <ChatList
+            activeUserID={activeConversation?.user_id}
+            conversations={conversations}
+            onSelect={handleSelectConversation}
+            onSearchChange={setSearchQuery}
+            onStartConversation={handleStartConversation}
+            isSearching={isSearching}
+            searchQuery={searchQuery}
+            searchResults={searchResults}
+            isOpen={isSidebarOpen}
+          />
+        </div>
+      )}
 
-        <ChatList
-          activeUserID={activeConversation?.user_id}
-          conversations={conversations}
-          onSelect={handleSelectConversation}
-          onSearchChange={setSearchQuery}
-          onStartConversation={handleStartConversation}
-          isSearching={isSearching}
-          searchQuery={searchQuery}
-          searchResults={searchResults}
-          isOpen={isSidebarOpen}
+      {/* Mobile Sidebar Overlay */}
+      {!isDesktop && isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+          onClick={() => setIsSidebarOpen(false)}
         />
-        <ChatWindow
-          callNotice={callNotice}
-          callSession={callSession}
-          conversationLastActivity={activeConversation?.last_message_at}
-          conversationUserID={activeConversation?.user_id}
-          currentUserID={user.id}
-          disabled={!activeConversation}
-          isOnline={isOnline}
-          messages={messages}
-          messageCount={messages.length}
-          onAcceptCall={acceptIncomingCall}
-          onDeclineCall={declineIncomingCall}
-          onDismissCallNotice={dismissCallNotice}
-          onEndCall={endCall}
-          onClearConversation={handleClearConversation}
-          onDeleteMessages={handleDeleteMessages}
-          onSend={handleSend}
-          onStartAudioCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername, "audio")}
-          onStartVideoCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername, "video")}
-          onToggleMute={toggleMute}
-          onToggleVideo={toggleVideo}
-          onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
-          remoteVideoRef={remoteVideoRef}
-          localVideoRef={localVideoRef}
-          socketConnected={socket.isConnected}
-          title={activeConversation ? `@${activeConversation.username}` : "Choose a conversation"}
-        />
-      </div>
-    </main>
+      )}
+
+      {/* 3. Main Chat Window */}
+      {showChatWindow && (
+        <div className="flex-1 flex flex-col min-w-0 bg-surface-container-lowest h-full relative">
+          <ChatWindow
+            callNotice={callNotice}
+            callSession={callSession}
+            conversationLastActivity={activeConversation?.last_message_at}
+            conversationUserID={activeConversation?.user_id}
+            currentUserID={user.id}
+            disabled={!activeConversation}
+            isOnline={isOnline}
+            messages={messages}
+            messageCount={messages.length}
+            onAcceptCall={acceptIncomingCall}
+            onDeclineCall={declineIncomingCall}
+            onDismissCallNotice={dismissCallNotice}
+            onEndCall={endCall}
+            onClearConversation={handleClearConversation}
+            onDeleteMessages={handleDeleteMessages}
+            onSend={handleSend}
+            onStartAudioCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername, "audio")}
+            onStartVideoCall={() => startCall(activeConversation?.user_id || "", activeConversationUsername, "video")}
+            onToggleMute={toggleMute}
+            onToggleVideo={toggleVideo}
+            onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
+            remoteVideoRef={remoteVideoRef}
+            localVideoRef={localVideoRef}
+            socketConnected={socket.isConnected}
+            title={activeConversation ? `@${activeConversation.username}` : "Choose a conversation"}
+          />
+        </div>
+      )}
+    </div>
   );
 }

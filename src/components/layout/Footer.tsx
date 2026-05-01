@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 const socialLinks = [
   {
     href: "https://www.instagram.com/vignu_14/",
@@ -9,7 +11,7 @@ const socialLinks = [
     ),
   },
   {
-    href: "https://github.com/Vignu-14  ",
+    href: "https://github.com/Vignu-14",
     label: "GitHub",
     icon: (
       <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -28,28 +30,55 @@ const socialLinks = [
   },
 ];
 
+const footerLinks = [
+  { label: "Explore", href: "#" },
+  { label: "Community", href: "#" },
+  { label: "Code", href: "#" },
+  { label: "Privacy", href: "#" },
+  { label: "Terms", href: "#" },
+  { label: "Help", href: "#" },
+];
+
 export function Footer() {
   return (
     <footer className="site-footer">
-      <div className="site-footer__copy">
-        <p className="eyebrow">RepoTalk</p>
-        <p>Real connections through a cleaner social experience. No algorithms, just genuine conversations.</p>
+      <div className="site-footer__main">
+        <div className="site-footer__brand">
+          <p className="site-footer__brand-name">REPOTALK</p>
+          <p className="site-footer__brand-desc">
+            Real connections through a cleaner social experience. Built for developers and designers who appreciate focus.
+          </p>
+        </div>
+
+        <nav aria-label="Footer links" className="site-footer__links">
+          {footerLinks.map((link) => (
+            <a key={link.label} href={link.href} className="site-footer__link">
+              {link.label}
+            </a>
+          ))}
+        </nav>
       </div>
 
-      <nav aria-label="Social links" className="site-footer__socials">
-        {socialLinks.map((link) => (
-          <a
-            className="site-footer__social"
-            href={link.href}
-            key={link.label}
-            rel="noreferrer"
-            target="_blank"
-          >
-            {link.icon}
-            <span>{link.label}</span>
-          </a>
-        ))}
-      </nav>
+      <div className="site-footer__bottom">
+        <nav aria-label="Social links" className="site-footer__socials">
+          {socialLinks.map((link) => (
+            <a
+              className="site-footer__social"
+              href={link.href}
+              key={link.label}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {link.icon}
+              <span>{link.label}</span>
+            </a>
+          ))}
+        </nav>
+
+        <p className="site-footer__copyright">
+          © {new Date().getFullYear()} RepoTalk. Connecting developers through conversation.
+        </p>
+      </div>
     </footer>
   );
 }

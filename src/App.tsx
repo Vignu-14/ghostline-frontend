@@ -16,9 +16,9 @@ function AppShell() {
   const isChatPage = location.pathname === "/chat";
 
   return (
-    <div className="layout-app">
-      {!isChatPage && <Navbar />}
-      <main className={isChatPage ? "layout-main layout-main--chat" : "layout-main"}>
+    <div className={isChatPage ? "h-screen w-screen flex flex-col overflow-hidden bg-background text-on-background" : "layout-app bg-background text-on-background min-h-screen"}>
+      <Navbar />
+      <main className={isChatPage ? "flex-1 overflow-hidden flex w-full relative" : "layout-main flex-1"}>
         <Routes>
           <Route element={<HomePage />} path="/" />
           <Route element={<LoginPage />} path="/login" />

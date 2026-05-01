@@ -7,23 +7,23 @@ export function MobileNav() {
   return (
     <nav aria-label="Mobile navigation" className="mobile-nav">
       <div className="mobile-nav__shell">
-        <NavLink to="/">
-          <span className="mobile-nav__icon">🏠</span>
+        <NavLink end to="/">
+          <span className="material-symbols-outlined mobile-nav__icon">home</span>
           Feed
         </NavLink>
         <NavLink to="/chat">
-          <span className="mobile-nav__icon">💬</span>
+          <span className="material-symbols-outlined mobile-nav__icon">chat</span>
           Chat
         </NavLink>
         {user ? (
           <>
             <NavLink to={`/u/${user.username}`}>
-              <span className="mobile-nav__icon">👤</span>
+              <span className="material-symbols-outlined mobile-nav__icon">person</span>
               Profile
             </NavLink>
             {user.role === "admin" ? (
               <NavLink to="/admin">
-                <span className="mobile-nav__icon">⚙️</span>
+                <span className="material-symbols-outlined mobile-nav__icon">admin_panel_settings</span>
                 Admin
               </NavLink>
             ) : null}
@@ -31,11 +31,11 @@ export function MobileNav() {
         ) : (
           <>
             <NavLink to="/login">
-              <span className="mobile-nav__icon">🔑</span>
+              <span className="material-symbols-outlined mobile-nav__icon">login</span>
               Login
             </NavLink>
             <NavLink to="/register">
-              <span className="mobile-nav__icon">✨</span>
+              <span className="material-symbols-outlined mobile-nav__icon">person_add</span>
               Register
             </NavLink>
           </>

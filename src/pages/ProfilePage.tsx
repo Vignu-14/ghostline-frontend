@@ -121,6 +121,7 @@ export function ProfilePage() {
       {!isLoading && profile ? (
         <>
           <ProfileHeader 
+            userId={profile.id}
             username={profile.username}
             postCount={posts.length}
             profilePictureUrl={profile.profile_picture_url}

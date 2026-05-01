@@ -1,9 +1,6 @@
-import type { RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
-import { Button } from "../common/Button";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type { CallNotice, CallSession } from "../../types/call";
 import type { DeleteMode, Message } from "../../types/message";
-import { formatRelativeDate } from "../../utils/formatDate";
 import { CallPanel } from "./CallPanel";
 import { ChatMessage } from "./ChatMessage";
 import { MessageInput } from "./MessageInput";
@@ -50,13 +47,11 @@ type ChatWindowProps = {
 };
 
 export function ChatWindow({
-  conversationLastActivity,
   conversationUserID,
   currentUserID,
   disabled,
   isOnline,
   messages,
-  messageCount,
   onAcceptCall,
   onDeclineCall,
   onDismissCallNotice,
@@ -74,7 +69,6 @@ export function ChatWindow({
   callSession,
   remoteVideoRef,
   localVideoRef,
-  socketConnected,
 }: ChatWindowProps) {
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(null);
@@ -85,9 +79,6 @@ export function ChatWindow({
   const lastScrollCountRef = useRef(0);
   const lastConversationRef = useRef<string | undefined>(undefined);
 
-  const connectionTone = !isOnline ? "offline" : socketConnected ? "live" : "warming";
-  const connectionLabel = !isOnline ? "You are offline" : socketConnected ? "Connected" : "Reconnecting...";
-
   useEffect(() => {
     const el = messageListRef.current;
     if (!el) return;
@@ -95,15 +86,12 @@ export function ChatWindow({
     const isNewConversation = lastConversationRef.current !== conversationUserID;
     const hasNewMessages = messages.length > lastScrollCountRef.current;
 
-    // Determine if we should scroll
     let shouldScroll = false;
 
     if (isNewConversation) {
-      // Always scroll to bottom when switching chats
       shouldScroll = true;
     } else if (hasNewMessages) {
-      // Only scroll if user is already near the bottom
-      const threshold = 150; // pixels from bottom
+      const threshold = 150;
       const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
       shouldScroll = isNearBottom;
     }
@@ -112,7 +100,6 @@ export function ChatWindow({
       el.scrollTop = el.scrollHeight;
     }
 
-    // Update refs for next render
     lastScrollCountRef.current = messages.length;
     lastConversationRef.current = conversationUserID;
   }, [messages, disabled, conversationUserID]);
@@ -146,157 +133,200 @@ export function ChatWindow({
 
     setDeleteDialog({
       kind: "messages",
-      description:
-        "Delete for everyone will remove only your selected messages from both sides. Messages sent by the other person will only be removed for you.",
+      description: "This will permanently remove the selected messages for you.",
       messageIDs: selectedMessageIDs,
-      title:
-        selectedMessageIDs.length === 1
-          ? "Delete the selected message?"
-          : `Delete ${selectedMessageIDs.length} selected messages?`,
+      title: `Delete ${selectedMessageIDs.length} messages?`,
     });
   }
 
   function openClearDialog() {
     setDeleteDialog({
       kind: "clear",
-      description:
-        "Delete for me clears the whole chat only from your side. Delete for everyone clears the chat for you and removes only your own sent messages from the other person's side.",
-      title: "Clear this chat?",
+      description: "All messages in this chat will be cleared from your side.",
+      title: "Clear conversation?",
     });
   }
 
   async function handleDeleteConfirm(mode: DeleteMode) {
-    if (!deleteDialog || deleteDialog.kind !== "messages") {
-      return;
-    }
-
+    if (!deleteDialog || deleteDialog.kind !== "messages") return;
     setIsWorking(true);
-    setLocalError("");
-
     try {
       await onDeleteMessages(deleteDialog.messageIDs, mode);
       setDeleteDialog(null);
       setSelectedMessageIDs([]);
       setIsSelectionMode(false);
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Unable to delete messages.");
+      setLocalError(error instanceof Error ? error.message : "Error deleting messages");
     } finally {
       setIsWorking(false);
     }
   }
 
   async function handleClearConfirm(mode: DeleteMode) {
-    if (!conversationUserID) {
-      return;
-    }
-
+    if (!conversationUserID) return;
     setIsWorking(true);
-    setLocalError("");
-
     try {
       await onClearConversation(conversationUserID, mode);
       setDeleteDialog(null);
-      setSelectedMessageIDs([]);
-      setIsSelectionMode(false);
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Unable to clear the conversation.");
+      setLocalError(error instanceof Error ? error.message : "Error clearing chat");
     } finally {
       setIsWorking(false);
     }
   }
 
   return (
-    <section className="chat-main">
-      <header className="chat-header">
-        <div className="chat-header__left">
+    <section className="flex flex-col h-full w-full bg-surface-container-lowest overflow-hidden relative">
+      {/* Header */}
+      <header className="h-[72px] px-5 py-2 bg-surface/95 backdrop-blur-md border-b border-outline-variant/30 flex items-center justify-between shrink-0 z-20">
+        <div className="flex items-center gap-3 min-w-0">
           <button
-            className="mobile-sidebar-toggle"
+            className="md:hidden w-10 h-10 flex items-center justify-center hover:bg-surface-container-high rounded-full transition-all active:scale-90 text-on-surface-variant"
             onClick={onToggleSidebar}
             type="button"
-            aria-label="Toggle conversations"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
+            <span className="material-symbols-outlined text-[24px]">menu</span>
           </button>
-          <div className="chat-header__info">
-            <h2>{title}</h2>
-            <div className="chat-header__meta">
-              <span className={`chat-header__status chat-header__status--${connectionTone}`}>
-                <span className={`status-dot status-dot--${connectionTone}`} />
-                {connectionLabel}
-              </span>
-              {messageCount > 0 && (
-                <span className="text-faint text-xs">• {messageCount} messages</span>
-              )}
+          
+          {!disabled && (
+            <div className="flex items-center gap-3 cursor-pointer p-1.5 pr-4 rounded-2xl hover:bg-surface-container transition-all min-w-0 group">
+               <div className="relative shrink-0">
+                  <div className="w-11 h-11 rounded-full overflow-hidden bg-surface-container flex items-center justify-center text-on-surface-variant font-bold text-base border-2 border-surface shadow-sm group-hover:border-primary/20 transition-all">
+                     {messages[0]?.sender_avatar_url ? (
+                       <img src={messages[0].sender_avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                     ) : (
+                       <span>{title.replace('@', '').charAt(0).toUpperCase()}</span>
+                     )}
+                  </div>
+                  {isOnline && (
+                    <div className="absolute bottom-0 right-0.5 w-3.5 h-3.5 bg-tertiary-fixed border-2 border-surface rounded-full shadow-sm"></div>
+                  )}
+               </div>
+               <div className="flex flex-col min-w-0">
+                  <h2 className="text-[16px] font-bold text-on-surface truncate leading-tight tracking-tight">{title}</h2>
+                  <span className="text-[11px] text-on-surface-variant/70 truncate font-semibold uppercase tracking-wider mt-0.5">
+                    {isOnline ? 'Online now' : 'click for info'}
+                  </span>
+               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {!disabled ? (
-          <div className="chat-header__actions">
-            {isSelectionMode ? (
-              <>
-                <span className="text-muted text-xs" style={{ marginRight: '4px' }}>
-                  {selectedMessageIDs.length > 0
-                    ? `${selectedMessageIDs.length} selected`
-                    : "Tap to select"}
-                </span>
-                <Button
-                  disabled={selectedMessageIDs.length === 0 || isWorking}
-                  onClick={openSelectedDeleteDialog}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                >
-                  Delete
-                </Button>
-                <Button
-                  disabled={isWorking}
-                  onClick={() => {
-                    setDeleteDialog(null);
-                    setIsSelectionMode(false);
-                    setLocalError("");
-                    setSelectedMessageIDs([]);
-                  }}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                >
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button disabled={isWorking} onClick={() => setIsSelectionMode(true)} type="button" variant="ghost" size="sm">
-                  Select
-                </Button>
-                <Button
-                  disabled={isWorking || !conversationUserID || Boolean(callSession)}
-                  onClick={() => void onStartAudioCall()}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Audio call"
-                >
-                  <CallIcon />
-                </Button>
-                <Button disabled={isWorking} onClick={openClearDialog} type="button" variant="outline" size="sm">
-                  Clear
-                </Button>
-              </>
-            )}
-          </div>
-        ) : null}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {!disabled && !isSelectionMode && (
+             <>
+               <button 
+                 onClick={() => void onStartVideoCall()}
+                 className="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high rounded-full transition-all text-on-surface-variant active:scale-90"
+                 title="Video call"
+               >
+                 <span className="material-symbols-outlined text-[22px]">videocam</span>
+               </button>
+               <button 
+                 onClick={() => void onStartAudioCall()}
+                 className="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high rounded-full transition-all text-on-surface-variant active:scale-90" 
+                 title="Voice call"
+               >
+                 <span className="material-symbols-outlined text-[22px]">call</span>
+               </button>
+               <button className="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high rounded-full transition-all text-on-surface-variant active:scale-90" title="Search">
+                 <span className="material-symbols-outlined text-[22px]">search</span>
+               </button>
+               <button 
+                 onClick={openClearDialog}
+                 className="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high rounded-full transition-all text-on-surface-variant active:scale-90" 
+                 title="More"
+               >
+                 <span className="material-symbols-outlined text-[22px]">more_vert</span>
+               </button>
+             </>
+          )}
+          {isSelectionMode && (
+            <div className="flex items-center gap-2 bg-surface-container rounded-full px-2 py-1 border border-outline-variant/30">
+               <span className="text-xs font-bold text-primary px-2">{selectedMessageIDs.length} selected</span>
+               <button 
+                 disabled={selectedMessageIDs.length === 0}
+                 onClick={openSelectedDeleteDialog}
+                 className="px-3 py-1.5 bg-error text-on-error rounded-full text-[11px] font-bold uppercase tracking-wider disabled:opacity-50"
+               >
+                 Delete
+               </button>
+               <button 
+                 onClick={() => setIsSelectionMode(false)}
+                 className="px-3 py-1.5 hover:bg-surface-container-highest rounded-full text-[11px] font-bold uppercase tracking-wider"
+               >
+                 Cancel
+               </button>
+            </div>
+          )}
+        </div>
       </header>
 
-      {localError ? (
-        <div style={{ padding: '8px 24px' }}>
-          <p className="form-error">{localError}</p>
+      {localError && (
+        <div className="absolute top-[72px] left-0 right-0 bg-error/10 text-error text-[12px] font-semibold py-2 px-6 text-center border-b border-error/20 z-30 animate-in slide-in-from-top duration-300">
+          {localError}
         </div>
-      ) : null}
+      )}
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto relative bg-surface-container-lowest custom-scrollbar scroll-smooth" ref={messageListRef}>
+        {/* Pattern Overlay */}
+        <div 
+          className="absolute inset-0 opacity-[0.04] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"
+          style={{ backgroundSize: '180px', filter: 'var(--ui-pattern-filter)' }}
+        ></div>
+
+        <div className="relative mx-auto flex min-h-full w-full max-w-[86rem] flex-col px-4 py-6 sm:px-6 sm:py-8">
+           {disabled ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
+                <div className="w-24 h-24 bg-primary/10 rounded-[40px] flex items-center justify-center mb-6 shadow-sm border border-primary/5">
+                  <span className="material-symbols-outlined text-[48px] text-primary">chat_bubble</span>
+                </div>
+                <h3 className="text-xl font-bold text-on-surface tracking-tight">Your secure space</h3>
+                <p className="text-sm text-on-surface-variant/70 mt-3 max-w-[20rem] leading-relaxed">
+                   Select a contact to begin a private conversation. All messages are encrypted.
+                </p>
+                <div className="mt-8 flex gap-3">
+                   <div className="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-2xl border border-outline-variant/30">
+                      <span className="material-symbols-outlined text-[18px] text-primary">verified_user</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Secure</span>
+                   </div>
+                   <div className="flex items-center gap-2 px-4 py-2 bg-surface-container rounded-2xl border border-outline-variant/30">
+                      <span className="material-symbols-outlined text-[18px] text-tertiary">lock</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Private</span>
+                   </div>
+                </div>
+              </div>
+           ) : messages.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
+                <div className="w-20 h-20 bg-surface rounded-[32px] flex items-center justify-center mb-5 shadow-md border border-outline-variant/10">
+                   <span className="text-3xl animate-bounce">👋</span>
+                </div>
+                <h3 className="text-lg font-bold text-on-surface">Say hello!</h3>
+                <p className="text-sm text-on-surface-variant/70 mt-1.5">Start the conversation with {title}</p>
+              </div>
+           ) : (
+             <div className="py-2">
+                {messages.map((message, index) => {
+                  const prevMessage = messages[index - 1];
+                  const isSameSender = prevMessage && prevMessage.sender_id === message.sender_id;
+                  return (
+                    <ChatMessage
+                      key={message.id}
+                      isOwn={message.sender_id === currentUserID}
+                      isSelected={selectedMessageIDs.includes(message.id)}
+                      isSelectionMode={isSelectionMode}
+                      message={message}
+                      onToggleSelect={toggleSelection}
+                      showAvatar={!isSameSender}
+                      isClustered={isSameSender}
+                    />
+                  );
+                })}
+             </div>
+           )}
+        </div>
+      </div>
 
       <CallPanel
         callNotice={callNotice}
@@ -311,99 +341,44 @@ export function ChatWindow({
         localVideoRef={localVideoRef}
       />
 
-      <div className="chat-messages" ref={messageListRef}>
-        {disabled ? (
-          <div className="empty-state">
-            <div className="empty-state__icon">💬</div>
-            <h3>No chat selected</h3>
-            <p>Pick a conversation from the sidebar or search for someone new.</p>
-          </div>
-        ) : null}
-
-        {!disabled && messages.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state__icon">👋</div>
-            <h3>Start the conversation</h3>
-            <p>Send the first message — say hello!</p>
-          </div>
-        ) : null}
-
-        {!disabled
-          ? messages.map((message, index) => {
-            const prevMessage = messages[index - 1];
-            const isSameSender = prevMessage && prevMessage.sender_id === message.sender_id;
-            
-            return (
-              <ChatMessage
-                key={message.id}
-                isOwn={message.sender_id === currentUserID}
-                isSelected={selectedMessageIDs.includes(message.id)}
-                isSelectionMode={isSelectionMode}
-                message={message}
-                onToggleSelect={toggleSelection}
-                showAvatar={!isSameSender}
-                isClustered={isSameSender}
-              />
-            );
-          })
-          : null}
-      </div>
-
       <MessageInput disabled={disabled || isWorking} onSend={onSend} />
-
-      {deleteDialog ? (
-        <div className="chat-dialog-overlay">
-          <div className="chat-dialog">
-            <p className="chat-dialog__label">
-              {deleteDialog.kind === "clear" ? "Clear conversation" : "Delete options"}
-            </p>
-            <h3>{deleteDialog.title}</h3>
-            <p>{deleteDialog.description}</p>
-
-            <div className="chat-dialog__actions">
-              <Button disabled={isWorking} onClick={() => setDeleteDialog(null)} type="button" variant="ghost" size="sm">
-                Cancel
-              </Button>
-              {deleteDialog.kind === "messages" ? (
-                <Button disabled={isWorking} onClick={() => void handleDeleteConfirm("everyone")} type="button" variant="outline" size="sm">
-                  Delete for everyone
-                </Button>
-              ) : null}
-              {deleteDialog.kind === "messages" ? (
-                <Button disabled={isWorking} onClick={() => void handleDeleteConfirm("me")} type="button" variant="primary" size="sm">
-                  Delete for me
-                </Button>
-              ) : (
-                <>
-                  <Button disabled={isWorking} onClick={() => void handleClearConfirm("everyone")} type="button" variant="outline" size="sm">
-                    Delete for everyone
-                  </Button>
-                  <Button disabled={isWorking} onClick={() => void handleClearConfirm("me")} type="button" variant="primary" size="sm">
-                    Delete for me
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
+      
+      {/* Redesigned Dialog */}
+      {deleteDialog && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+           <div className="bg-surface w-full max-w-[340px] rounded-[32px] overflow-hidden shadow-2xl border border-outline-variant/30 animate-in zoom-in-95 duration-200">
+              <div className="p-8 pb-6 flex flex-col items-center text-center">
+                 <div className="w-16 h-16 bg-error-container text-on-error-container rounded-3xl flex items-center justify-center mb-6">
+                    <span className="material-symbols-outlined text-[32px]">{deleteDialog.kind === 'clear' ? 'delete_sweep' : 'delete'}</span>
+                 </div>
+                 <h3 className="text-xl font-bold text-on-surface tracking-tight mb-2">{deleteDialog.title}</h3>
+                 <p className="text-[13.5px] text-on-surface-variant leading-relaxed">
+                   {deleteDialog.description}
+                 </p>
+              </div>
+              <div className="px-6 pb-8 flex flex-col gap-2">
+                 <button 
+                   onClick={() => deleteDialog.kind === 'messages' ? void handleDeleteConfirm('me') : void handleClearConfirm('me')}
+                   className="w-full py-3.5 bg-error text-on-error rounded-2xl font-bold text-sm shadow-lg shadow-error/20 active:scale-[0.98] transition-all"
+                 >
+                   Delete for me
+                 </button>
+                 <button 
+                   onClick={() => deleteDialog.kind === 'messages' ? void handleDeleteConfirm('everyone') : void handleClearConfirm('everyone')}
+                   className="w-full py-3.5 bg-surface-container-high text-on-surface-variant rounded-2xl font-bold text-sm active:scale-[0.98] transition-all"
+                 >
+                   Delete for everyone
+                 </button>
+                 <button 
+                   onClick={() => setDeleteDialog(null)}
+                   className="w-full py-3.5 bg-transparent text-on-surface-variant/60 rounded-2xl font-bold text-xs uppercase tracking-widest mt-2 hover:bg-surface-container-low transition-all"
+                 >
+                   Cancel
+                 </button>
+              </div>
+           </div>
         </div>
-      ) : null}
+      )}
     </section>
-  );
-}
-
-function CallIcon() {
-  return (
-    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-    </svg>
-  );
-}
-
-function VideoIcon() {
-  return (
-    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="23 7 16 12 23 17 23 7"></polygon>
-      <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-    </svg>
   );
 }

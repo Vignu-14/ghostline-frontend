@@ -40,50 +40,43 @@ export function MessageInput({ disabled, onSend }: MessageInputProps) {
   }
 
   return (
-    <div className="chat-input-dock" style={{ background: 'transparent', borderTop: 'none' }}>
-      <form 
-        className="chat-input-form" 
-        onSubmit={handleSubmit}
-        style={{
-          border: '1px solid var(--line)',
-          borderRadius: 'var(--radius-full)',
-          padding: '8px 16px',
-          margin: '16px',
-          background: 'var(--surface-strong)',
-          boxShadow: 'var(--shadow-sm)'
-        }}
+    <div className="p-4 pb-6 bg-surface-container-lowest flex items-center gap-2 shrink-0 z-10">
+      <button 
+        type="button" 
+        className="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high rounded-full transition-all active:scale-90"
+        title="Attach file"
       >
+        <span className="material-symbols-outlined text-[24px]">add</span>
+      </button>
+      
+      <form onSubmit={handleSubmit} className="flex-1 flex items-center bg-surface-container-low rounded-full px-4 py-1.5 focus-within:ring-2 focus-within:ring-primary/50 transition-all">
+        <button type="button" className="p-1.5 text-on-surface-variant hover:text-on-surface transition-colors active:scale-90" title="Emojis">
+          <span className="material-symbols-outlined text-[22px]">mood</span>
+        </button>
         <input
-          className="chat-input-field"
           ref={inputRef}
           disabled={disabled || isSending}
           onChange={(event) => setContent(event.target.value)}
-          placeholder={disabled ? "Select a conversation..." : "Type your message..."}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            boxShadow: 'none',
-            padding: '4px 8px'
-          }}
+          placeholder={disabled ? "Select a chat to start messaging" : "Type a message"}
+          className="flex-1 bg-transparent border-none focus:ring-0 text-[14px] py-2 text-on-surface placeholder:text-on-surface-variant/40 outline-none"
           value={content}
         />
-        <button 
-          className="chat-send-btn" 
-          disabled={disabled || isSending || !content.trim()} 
-          type="submit"
-          aria-label="Send message"
-          style={{
-            height: '36px',
-            width: '36px',
-            minWidth: '36px'
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
       </form>
+
+      <button 
+        disabled={disabled || isSending}
+        onClick={(e) => { if (content.trim()) { e.preventDefault(); void handleSubmit(e as any); } }}
+        className={`w-11 h-11 flex items-center justify-center rounded-full transition-all active:scale-90 shadow-sm ${
+          content.trim() 
+            ? 'bg-primary text-on-primary shadow-primary/20 scale-105' 
+            : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+        }`}
+        title={content.trim() ? "Send" : "Voice message"}
+      >
+        <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: content.trim() ? "'FILL' 1" : "" }}>
+          {content.trim() ? 'send' : 'mic'}
+        </span>
+      </button>
     </div>
   );
 }
